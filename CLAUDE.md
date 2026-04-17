@@ -8,7 +8,7 @@ This file is the primary context for Claude Code working on this project. Read i
 
 Reusable tournament platform for **FK Dunav Ostrovo**, first deployed for the 2026 edition on **June 27–28, 2026**. Replaces the Webflow static site from 2025 (`https://fk-dunav.webflow.io/`) with a dynamic app where live results, match events, photos, and side competitions are updated in real time by multiple reporters and visible live to the public.
 
-**Owner:** Stefan (sole developer).
+**Owner:** Stefan (sole developer) — `stefan.ninkov@gmail.com` is the sole bootstrap admin; added manually to the `/adminEmails` Firestore collection via Firebase console before first deploy. All other admins/reporters are invited later through `/admin/korisnici`.
 **Brand:** FK Dunav blue `#01458E`, logo in `/assets/logo.svg` (68KB SVG with embedded raster).
 **Language:** Latin-script Serbian throughout the UI. No Cyrillic, no English toggle.
 **Deadline:** Tournament kicks off **June 27, 2026** — the site must be fully operational with reporters trained by **June 20, 2026**.

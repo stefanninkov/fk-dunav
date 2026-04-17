@@ -305,7 +305,8 @@ Organized by feature area. Components live in `src/components/` for shared, `src
 ### 9.11 Side features
 - `<KupSankaLeaderboard entries />`
 - `<CrossbarBracket participants />`
-- `<AwardsBoard awards />`
+- `<AwardsBoard awards />` — surfaces Champion / Runner-up / MVP / Top Scorer **and the crossbar (prečka bosom nogom) winner** as peer awards.
+- `<LotteryBoard prizes />` — public read-only Lutrija board. Renders the `/tournaments/{id}/lottery` collection ordered by `prize.order asc`. Each row: ordinal badge (1/2/3 … using `accent.gold/silver/bronze` then brand-blue for the rest), prize label, winner name, optional photo avatar. Admin-side variant (`<LotteryBoardEditor />`, colocated under `src/features/awards/components/`) adds drag-to-reorder and an "Dodaj dobitnika" row: prize label input, winner name input, optional photo upload, save → writes to `/tournaments/{id}/lottery/{prizeId}`. Mounted on both `/statistika` (public) and `/admin/nagrade` (admin).
 - `<TopScorersList />`
 - `<FanVotePoll poll />`
 - `<SponsorGrid tier />`

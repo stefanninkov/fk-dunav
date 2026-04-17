@@ -21,7 +21,7 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Firestore rules starter (deny-all fallback) and `firestore.indexes.json`.
 - [ ] Zustand `useAuthStore`, `useOfflineStore`, `useUIStore` created (empty shells).
 - [ ] `<PublicLayout>` and `<AdminLayout>` skeletons. Bottom nav on mobile for admin.
-- [ ] Login page with magic link flow. Admin bootstrap: Stefan's email in `/adminEmails` manually.
+- [ ] Login page with magic link flow. **Admin bootstrap:** before first deploy, Stefan adds a single document to the `/adminEmails` Firestore collection manually via the Firebase console with `email: "stefan.ninkov@gmail.com"` (the hardcoded sole day-one admin). The magic-link Cloud Function reads that collection on first sign-in and promotes the matching user to the `admin` custom claim. No other admins are hardcoded — everyone else joins later through `/admin/korisnici`.
 - [ ] First successful login end-to-end → lands on empty `/admin`.
 - [ ] GitHub Actions workflow: build + lint + typecheck on every push. Deploy to `gh-pages` on `main`.
 - [ ] Firebase deploy workflow for functions + rules.
@@ -157,8 +157,10 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] `/admin/precka` editor + `<CrossbarBracket>` on public stats page.
 - [ ] `/admin/sponzori` CRUD + `<SponsorGrid>` + `<SponsorTicker>` in footer.
 - [ ] `/sponzori` public page with tiers.
-- [ ] `/admin/nagrade` — awards entry (champions, MVP, runner-up, 3rd, top scorer, team of the tournament).
-- [ ] `<AwardsBoard>` on public stats page (visible once populated).
+- [ ] `/admin/nagrade` — awards entry (champions, MVP, runner-up, 3rd, top scorer, team of the tournament, **crossbar / prečka bosom nogom winner**).
+- [ ] `<AwardsBoard>` on public stats page (visible once populated) — surfaces the crossbar winner as a peer award alongside Champion / Runner-up / MVP / Top Scorer.
+- [ ] **Lutrija (awards overview only):** `/admin/nagrade` Lutrija sub-section — admin enters prize winners by hand (prize label, winner name, optional photo, order). Writes to `/tournaments/{id}/lottery/{prizeId}`. No ticket management, no draw mechanics.
+- [ ] `<LotteryBoard>` rendered on `/statistika` as its own public section; mirrored by `<LotteryBoardEditor>` on `/admin/nagrade`.
 - [ ] `<FanVotePoll>` on `/statistika` once admin opens a poll.
 - [ ] `/admin/glasanje` poll management.
 - [ ] One vote per device enforced via cookie + security rule.
