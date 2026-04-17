@@ -42,7 +42,7 @@ fk-dunav-tournament/
 │   ├── ARCHITECTURE.md       ← routing, auth, offline, FCM, image pipeline
 │   ├── SECURITY-RULES.md     ← Firestore + Storage rules logic
 │   ├── DESIGN.md             ← brand, tokens, component system
-│   └── ROADMAP.md            ← 10-week sprint plan
+│   └── ROADMAP.md            ← 10-phase build plan
 ├── assets/
 │   └── logo.svg              ← brand logo
 ├── src/

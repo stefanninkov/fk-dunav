@@ -4,8 +4,8 @@ interface Props {
 }
 
 /**
- * Placeholder shell used by Week-1 route stubs. Each page gets replaced with
- * real content in the later roadmap weeks (SPEC.md sections 3.x).
+ * Placeholder shell used by Phase-1 route stubs. Each page gets replaced
+ * with real content in the later roadmap phases (SPEC.md sections 3.x).
  */
 export function PagePlaceholder({ title, description }: Props) {
   return (

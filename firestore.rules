@@ -1,9 +1,9 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Firestore rules — Week 1 starter.
+// Firestore rules — Phase 1 starter.
 //
-// Default posture: DENY ALL. Real rules per-collection land in Week 2
+// Default posture: DENY ALL. Real rules per-collection land in Phase 2
 // and beyond, following docs/SECURITY-RULES.md.
 //
 // The only exception is /adminEmails, which is read by the magic-link
@@ -34,7 +34,7 @@ service cloud.firestore {
     }
 
     // Deny-all fallback. Every collection gets an explicit rule in later
-    // weeks; until then nothing else is accessible from the client.
+    // phases; until then nothing else is accessible from the client.
     match /{document=**} {
       allow read, write: if false;
     }

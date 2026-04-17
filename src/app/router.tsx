@@ -67,7 +67,7 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <AdminHomePage /> },
-          // TODO(Week 2+): utakmice, timovi, igraci, raspored, galerija,
+          // TODO(Phase 2+): utakmice, timovi, igraci, raspored, galerija,
           // obavestenja, sponzori, kup-sanka, precka, nagrade, turnir,
           // korisnici, glasanje, sampioni.
           { path: '*', element: <Navigate to="/admin" replace /> },

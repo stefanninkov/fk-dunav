@@ -5,7 +5,7 @@ import path from 'node:path';
 
 export default defineConfig(({ mode }) => ({
   // GitHub Pages project page: https://stefanninkov.github.io/fk-dunav/.
-  // Custom domain (Week 9) will flip this back to '/' via env.
+  // Custom domain (Phase 9) will flip this back to '/' via env.
   base: mode === 'production' ? (process.env.VITE_BASE_PATH ?? '/fk-dunav/') : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
