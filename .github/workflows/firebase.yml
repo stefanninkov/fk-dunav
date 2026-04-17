@@ -32,11 +32,9 @@ jobs:
         run: npm --prefix functions install
       - name: Build functions
         run: npm --prefix functions run build
-      - name: Deploy rules, indexes, functions
-        # Storage stays out until Phase 7 enables the bucket + grants the
-        # service account the storage-admin role.
+      - name: Deploy rules, indexes, storage, functions
         uses: w9jds/firebase-action@v14.2.0
         with:
-          args: deploy --only firestore:rules,firestore:indexes,functions --project fk-dunav --force
+          args: deploy --only firestore:rules,firestore:indexes,storage,functions --project fk-dunav --force
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

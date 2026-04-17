@@ -1,15 +1,57 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Storage rules — Phase 1 starter.
+// Storage rules — Phase 7 (photos + moderation).
 //
-// Default posture: DENY ALL. Real rules for uploads/approved/rejected,
-// team-logos, player-photos, sponsor-logos, og-cards, and tournament-
-// assets land alongside the photo-moderation work in Phase 7.
+// /uploads/pending/{photoId}/{file}  — anonymous public write with
+//                                      size + mime constraints.
+//                                      No reads from clients.
+// /uploads/approved/{photoId}/{file} — public read; admin writes
+//                                      only (Cloud Function moves
+//                                      on approve).
+// /uploads/rejected/{photoId}/{file} — no read, admin write only.
+// /team-logos, /player-photos,
+// /sponsor-logos                    — public read, admin write.
+// /tournament-assets/**             — public read, admin write.
 // ------------------------------------------------------------------
 
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Only Cloud Functions use the Admin SDK and bypass rules, so we don't
+    // have an isAdmin() helper here. Admin browser writes go through the
+    // Admin SDK via callable functions; direct client writes for moderated
+    // paths are closed.
+
+    match /uploads/pending/{photoId}/{file=**} {
+      allow read: if false;
+      allow write: if request.resource.size <= 100 * 1024 * 1024        // 100 MB cap
+                   && (request.resource.contentType.matches('image/.*')
+                       || request.resource.contentType.matches('video/.*'));
+    }
+
+    match /uploads/approved/{photoId}/{file=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /uploads/rejected/{photoId}/{file=**} {
+      allow read, write: if false;
+    }
+
+    match /team-logos/{file=**}       { allow read: if true; allow write: if isSignedIn(); }
+    match /player-photos/{file=**}    { allow read: if true; allow write: if isSignedIn(); }
+    match /sponsor-logos/{file=**}    { allow read: if true; allow write: if isSignedIn(); }
+    match /og-cards/{file=**}         { allow read: if true; allow write: if false; }
+    match /tournament-assets/{tid}/{file=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -120,8 +120,14 @@ service cloud.firestore {
       }
 
       match /photos/{photoId} {
+        // Public sees approved only; admins see everything (incl. pending).
         allow read: if (resource != null && resource.data.status == 'approved') || isAdmin();
-        allow write: if isAdmin();
+        // Anyone can create a pending submission as long as status is
+        // 'pending' and takedownRequested is false. Admins alone can
+        // move it to approved/rejected or otherwise mutate.
+        allow create: if request.resource.data.status == 'pending'
+                      && request.resource.data.takedownRequested == false;
+        allow update, delete: if isAdmin();
       }
       match /announcements/{id} { allow read: if true; allow write: if isAdmin(); }
       match /sponsors/{id}      { allow read: if true; allow write: if isAdmin(); }
@@ -129,6 +135,7 @@ service cloud.firestore {
       match /crossbar/{pid}     { allow read: if true; allow write: if isAdmin(); }
       match /awards/{awardId}   { allow read: if true; allow write: if isAdmin(); }
       match /lottery/{prizeId}  { allow read: if true; allow write: if isAdmin(); }
+      match /content/{pageId}   { allow read: if true; allow write: if isAdmin(); }
       match /fanVotes/{pollId} {
         allow read: if true;
         allow write: if isAdmin();

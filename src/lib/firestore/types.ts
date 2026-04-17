@@ -209,6 +209,52 @@ export interface MatchEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Photo / video (gallery + moderation)
+
+export type PhotoStatus = 'pending' | 'approved' | 'rejected';
+export type PhotoMediaType = 'image' | 'video';
+
+export interface Photo {
+  id: string;
+  type: PhotoMediaType;
+  status: PhotoStatus;
+  storagePath: string;
+  thumbnailUrl?: string;
+  mediumUrl?: string;
+  fullUrl: string;
+  videoUrl?: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  matchId?: string;
+  teamIds: string[];
+  day?: string;
+  uploaderName?: string;
+  uploaderUserAgent?: string;
+  uploadedAt: Timestamp;
+  reviewedBy?: string;
+  reviewedAt?: Timestamp;
+  rejectionReason?: string;
+  takedownRequested: boolean;
+  takedownReason?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Content page (admin-editable markdown: /pravilnik, /o-turniru)
+
+export type ContentPageId = 'pravilnik' | 'oTurniru';
+
+export interface ContentPage {
+  id: ContentPageId;
+  title: string;
+  body: string; // markdown
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+// ---------------------------------------------------------------------------
 // Announcement
 
 export type AnnouncementSeverity = 'info' | 'warning' | 'urgent';

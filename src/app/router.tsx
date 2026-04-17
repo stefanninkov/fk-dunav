@@ -35,6 +35,8 @@ import { AnnouncementsPage as AdminAnnouncementsPage } from '@/pages/admin/Annou
 import { SponsorsPage as AdminSponsorsPage } from '@/pages/admin/SponsorsPage';
 import { KupSankaPage as AdminKupSankaPage } from '@/pages/admin/KupSankaPage';
 import { CrossbarPage as AdminCrossbarPage } from '@/pages/admin/CrossbarPage';
+import { ContentAdminPage } from '@/pages/admin/ContentPage';
+import { AdminGalleryPage } from '@/pages/admin/AdminGalleryPage';
 import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
@@ -97,6 +99,8 @@ export const router = createBrowserRouter([
           { path: 'sponzori', element: <AdminSponsorsPage /> },
           { path: 'kup-sanka', element: <AdminKupSankaPage /> },
           { path: 'precka', element: <AdminCrossbarPage /> },
+          { path: 'sadrzaj', element: <ContentAdminPage /> },
+          { path: 'galerija', element: <AdminGalleryPage /> },
           // TODO(later phases): utakmice editor, galerija, obavestenja,
           // sponzori, kup-sanka, precka, nagrade, korisnici, glasanje,
           // sampioni.

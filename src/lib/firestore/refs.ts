@@ -11,12 +11,14 @@ import {
   announcementConverter,
   appUserConverter,
   awardConverter,
+  contentPageConverter,
   crossbarConverter,
   groupConverter,
   kupSankaConverter,
   lotteryPrizeConverter,
   matchConverter,
   matchEventConverter,
+  photoConverter,
   playerConverter,
   pushSubscriptionConverter,
   sponsorConverter,
@@ -28,12 +30,15 @@ import type {
   Announcement,
   AppUser,
   Award,
+  ContentPage,
+  ContentPageId,
   CrossbarParticipant,
   Group,
   KupSankaEntry,
   LotteryPrize,
   Match,
   MatchEvent,
+  Photo,
   Player,
   PushSubscription,
   Sponsor,
@@ -186,3 +191,28 @@ export const pushSubscriptionDoc = (
   token: string,
 ): DocumentReference<PushSubscription> =>
   doc(db, 'pushSubscriptions', token).withConverter(pushSubscriptionConverter);
+
+export const photosCol = (tournamentId: string): CollectionReference<Photo> =>
+  collection(db, 'tournaments', tournamentId, 'photos').withConverter(photoConverter);
+
+export const photoDoc = (
+  tournamentId: string,
+  photoId: string,
+): DocumentReference<Photo> =>
+  doc(db, 'tournaments', tournamentId, 'photos', photoId).withConverter(photoConverter);
+
+// Admin-editable markdown pages, one doc per page id.
+export const contentPagesCol = (
+  tournamentId: string,
+): CollectionReference<ContentPage> =>
+  collection(db, 'tournaments', tournamentId, 'content').withConverter(
+    contentPageConverter,
+  );
+
+export const contentPageDoc = (
+  tournamentId: string,
+  pageId: ContentPageId,
+): DocumentReference<ContentPage> =>
+  doc(db, 'tournaments', tournamentId, 'content', pageId).withConverter(
+    contentPageConverter,
+  );

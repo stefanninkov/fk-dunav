@@ -28,6 +28,7 @@ admin.initializeApp();
 
 const db = admin.firestore();
 const messaging = admin.messaging();
+const bucket = admin.storage().bucket();
 
 // ---------------------------------------------------------------------------
 // promoteAdminOnLogin — v2 Identity Platform trigger
@@ -458,6 +459,45 @@ function advancementMap(): Record<string, { winner?: SlotTarget; loser?: SlotTar
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// purgeRejectedPhotos — daily scheduled cleanup
+// ---------------------------------------------------------------------------
+//
+// Runs once a day. Deletes storage objects + Firestore docs for photos
+// whose status is 'rejected' and whose review happened more than 7 days
+// ago. Uploaders get the 7-day grace window to file a takedown dispute.
+
+export const purgeRejectedPhotos = functions
+  .region('europe-west3')
+  .pubsub.schedule('every 24 hours')
+  .onRun(async () => {
+    const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 7 * 24 * 60 * 60 * 1000,
+    );
+    const snap = await db
+      .collectionGroup('photos')
+      .where('status', '==', 'rejected')
+      .where('reviewedAt', '<=', sevenDaysAgo)
+      .get();
+
+    const batch = db.batch();
+    const deletions: Promise<unknown>[] = [];
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (data.storagePath) {
+        deletions.push(
+          bucket
+            .file(data.storagePath)
+            .delete()
+            .catch(() => undefined),
+        );
+      }
+      batch.delete(d.ref);
+    }
+    await Promise.all(deletions);
+    await batch.commit();
+  });
 
 export const propagateBracketWinner = functions
   .region('europe-west3')

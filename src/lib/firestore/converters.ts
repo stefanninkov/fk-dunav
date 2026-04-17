@@ -11,7 +11,9 @@ import type {
   Announcement,
   AppUser,
   Award,
+  ContentPage,
   CrossbarParticipant,
+  Photo,
   Group,
   KupSankaEntry,
   LotteryPrize,
@@ -55,9 +57,11 @@ export const matchEventConverter  = makeConverter<MatchEvent>();
 export const lotteryPrizeConverter = makeConverter<LotteryPrize>();
 export const announcementConverter = makeConverter<Announcement>();
 export const sponsorConverter      = makeConverter<Sponsor>();
+export const photoConverter        = makeConverter<Photo>();
 export const kupSankaConverter     = makeConverter<KupSankaEntry>();
 export const crossbarConverter     = makeConverter<CrossbarParticipant>();
 export const awardConverter        = makeConverter<Award>();
 export const adminEmailConverter   = makeConverter<AdminEmail>();
 export const appUserConverter      = makeConverter<AppUser>();
 export const pushSubscriptionConverter = makeConverter<PushSubscription>();
+export const contentPageConverter  = makeConverter<ContentPage>();
