@@ -1,20 +1,16 @@
 import { NavLink } from 'react-router-dom';
 
 import { sr } from '@/i18n/sr';
+import { Countdown } from '@/features/home/Countdown';
 
 const TOURNAMENT_START = new Date('2026-06-27T10:00:00+02:00');
-
-function formatRemaining(target: Date, now: Date) {
-  const diff = Math.max(0, target.getTime() - now.getTime());
-  const days = Math.floor(diff / 86_400_000);
-  const hours = Math.floor((diff % 86_400_000) / 3_600_000);
-  return { days, hours };
-}
+const TOURNAMENT_END_WINDOW_MS = 48 * 3_600_000;
 
 export function HomePage() {
   const now = new Date();
-  const { days, hours } = formatRemaining(TOURNAMENT_START, now);
-  const isLive = now >= TOURNAMENT_START && now <= new Date(TOURNAMENT_START.getTime() + 48 * 3_600_000);
+  const isLive =
+    now >= TOURNAMENT_START &&
+    now <= new Date(TOURNAMENT_START.getTime() + TOURNAMENT_END_WINDOW_MS);
 
   return (
     <section className="relative overflow-hidden">
@@ -39,16 +35,11 @@ export function HomePage() {
             {sr.nav.live}
           </NavLink>
         ) : (
-          <div className="mt-8 flex items-center gap-4 font-display text-ink-primary">
-            <div className="flex flex-col items-center rounded-lg bg-surface-1 px-5 py-3 shadow-card">
-              <span className="tnum text-3xl font-700">{days}</span>
-              <span className="text-xs text-ink-tertiary">dana</span>
-            </div>
-            <div className="flex flex-col items-center rounded-lg bg-surface-1 px-5 py-3 shadow-card">
-              <span className="tnum text-3xl font-700">{hours}</span>
-              <span className="text-xs text-ink-tertiary">sati</span>
-            </div>
-            <span className="text-sm text-ink-secondary">do početka</span>
+          <div className="mt-8 flex flex-col gap-3">
+            <span className="text-xs uppercase tracking-wide text-ink-tertiary">
+              Do početka turnira
+            </span>
+            <Countdown target={TOURNAMENT_START} />
           </div>
         )}
       </div>

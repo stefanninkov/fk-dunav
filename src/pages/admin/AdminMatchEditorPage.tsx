@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { useMatchClock } from '@/features/match/useMatchClock';
 import {
+  abandonMatch,
   endHalf,
   endMatch,
   logCard,
@@ -21,6 +22,7 @@ import {
   startMatch,
   startSecondHalf,
 } from '@/features/match/matchActions';
+import { ShootoutModal } from '@/features/match/components/ShootoutModal';
 
 export function AdminMatchEditorPage() {
   const { matchId } = useParams<{ matchId: string }>();
@@ -30,6 +32,7 @@ export function AdminMatchEditorPage() {
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shootoutOpen, setShootoutOpen] = useState(false);
 
   useEffect(() => {
     if (!active || !matchId) return;
@@ -199,18 +202,45 @@ export function AdminMatchEditorPage() {
         ) : null}
 
         {match.status === 'live' ? (
-          <Btn
-            variant="danger"
-            busy={busy}
-            onClick={() => {
-              if (!confirm('Završiti utakmicu?')) return;
-              void act(() => endMatch(active.id, match.id, uid, displayMinute));
-            }}
-          >
-            {sr.match.actions.end}
-          </Btn>
+          <>
+            <Btn
+              variant="danger"
+              busy={busy}
+              onClick={() => {
+                const tied = match.score.a === match.score.b;
+                if (match.phase === 'knockout' && tied) {
+                  setShootoutOpen(true);
+                  return;
+                }
+                if (!confirm('Završiti utakmicu?')) return;
+                void act(() => endMatch(active.id, match.id, uid, displayMinute));
+              }}
+            >
+              {sr.match.actions.end}
+            </Btn>
+            <Btn
+              variant="ghost"
+              busy={busy}
+              onClick={() => {
+                if (!confirm('Prekinuti utakmicu?')) return;
+                void act(() => abandonMatch(active.id, match.id, uid, displayMinute));
+              }}
+            >
+              Prekini
+            </Btn>
+          </>
         ) : null}
       </section>
+
+      {shootoutOpen ? (
+        <ShootoutModal
+          tournamentId={active.id}
+          match={match}
+          uid={uid}
+          displayMinute={displayMinute}
+          onClose={() => setShootoutOpen(false)}
+        />
+      ) : null}
 
       <section>
         <h2 className="mb-3 font-display text-sm font-600 text-ink-secondary">Tok utakmice</h2>

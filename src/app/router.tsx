@@ -29,6 +29,7 @@ import { PlayersPage as AdminPlayersPage } from '@/pages/admin/PlayersPage';
 import { SchedulePage as AdminSchedulePage } from '@/pages/admin/SchedulePage';
 import { AdminMatchesPage } from '@/pages/admin/AdminMatchesPage';
 import { AdminMatchEditorPage } from '@/pages/admin/AdminMatchEditorPage';
+import { BracketPage as AdminBracketPage } from '@/pages/admin/BracketPage';
 import { AwardsPage as AdminAwardsPage } from '@/pages/admin/AwardsPage';
 import { AnnouncementsPage as AdminAnnouncementsPage } from '@/pages/admin/AnnouncementsPage';
 import { SponsorsPage as AdminSponsorsPage } from '@/pages/admin/SponsorsPage';
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
           { path: 'raspored', element: <AdminSchedulePage /> },
           { path: 'utakmice', element: <AdminMatchesPage /> },
           { path: 'utakmice/:matchId', element: <AdminMatchEditorPage /> },
+          { path: 'bracket', element: <AdminBracketPage /> },
           { path: 'nagrade', element: <AdminAwardsPage /> },
           { path: 'obavestenja', element: <AdminAnnouncementsPage /> },
           { path: 'sponzori', element: <AdminSponsorsPage /> },

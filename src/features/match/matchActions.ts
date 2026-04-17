@@ -186,10 +186,11 @@ export async function endMatch(
   matchId: string,
   uid: string,
   displayMinute: number,
+  shootoutScore?: { a: number; b: number },
 ): Promise<void> {
   const ref = matchDoc(tournamentId, matchId);
   const batch = writeBatch(db);
-  batch.update(ref, {
+  const update: Record<string, unknown> = {
     status: 'finished',
     'clock.state': 'ended',
     'clock.halfStartedAt': null,
@@ -197,10 +198,36 @@ export async function endMatch(
     actualEnd: serverTimestamp(),
     updatedAt: serverTimestamp(),
     updatedBy: uid,
-  });
+  };
+  if (shootoutScore) update.shootoutScore = shootoutScore;
+  batch.update(ref, update);
   await appendEventBatch(batch, tournamentId, matchId, {
     type: 'matchEnd',
     minute: displayMinute,
+    createdBy: uid,
+  });
+  await batch.commit();
+}
+
+export async function abandonMatch(
+  tournamentId: string,
+  matchId: string,
+  uid: string,
+  minute: number,
+): Promise<void> {
+  const ref = matchDoc(tournamentId, matchId);
+  const batch = writeBatch(db);
+  batch.update(ref, {
+    status: 'abandoned',
+    'clock.state': 'ended',
+    'clock.halfStartedAt': null,
+    'clock.displayMinute': minute,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+  await appendEventBatch(batch, tournamentId, matchId, {
+    type: 'abandoned',
+    minute,
     createdBy: uid,
   });
   await batch.commit();
