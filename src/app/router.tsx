@@ -21,6 +21,10 @@ import { NotFoundPage } from '@/pages/public/NotFoundPage';
 
 import { LoginPage } from '@/pages/admin/LoginPage';
 import { AdminHomePage } from '@/pages/admin/AdminHomePage';
+import { TournamentPage } from '@/pages/admin/TournamentPage';
+import { TeamsPage as AdminTeamsPage } from '@/pages/admin/TeamsPage';
+import { PlayersPage as AdminPlayersPage } from '@/pages/admin/PlayersPage';
+import { SchedulePage as AdminSchedulePage } from '@/pages/admin/SchedulePage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
 
@@ -67,9 +71,13 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <AdminHomePage /> },
-          // TODO(Phase 2+): utakmice, timovi, igraci, raspored, galerija,
-          // obavestenja, sponzori, kup-sanka, precka, nagrade, turnir,
-          // korisnici, glasanje, sampioni.
+          { path: 'turnir', element: <TournamentPage /> },
+          { path: 'timovi', element: <AdminTeamsPage /> },
+          { path: 'igraci', element: <AdminPlayersPage /> },
+          { path: 'raspored', element: <AdminSchedulePage /> },
+          // TODO(later phases): utakmice editor, galerija, obavestenja,
+          // sponzori, kup-sanka, precka, nagrade, korisnici, glasanje,
+          // sampioni.
           { path: '*', element: <Navigate to="/admin" replace /> },
         ],
       },

@@ -9,6 +9,7 @@ export const sr = {
     cancel: 'Otkaži',
     delete: 'Obriši',
     edit: 'Izmeni',
+    create: 'Kreiraj',
     close: 'Zatvori',
     back: 'Nazad',
     next: 'Dalje',
@@ -17,6 +18,8 @@ export const sr = {
     no: 'Ne',
     required: 'Obavezno polje',
     offline: 'Nema interneta — promene se čuvaju lokalno i sinhronizuju po povezivanju.',
+    empty: 'Nema unosa.',
+    errorGeneric: 'Došlo je do greške. Pokušaj ponovo.',
   },
 
   brand: {
@@ -72,6 +75,53 @@ export const sr = {
       champions: 'Šampioni',
     },
     logout: 'Odjava',
+
+    tournament: {
+      title: 'Turniri',
+      newButton: 'Kreiraj turnir',
+      noActive: 'Nema aktivnog turnira. Kreiraj novi ili aktiviraj postojeći.',
+      activeBadge: 'Aktivan',
+      draftBadge: 'Draft',
+      archivedBadge: 'Arhiviran',
+      activate: 'Aktiviraj',
+      archive: 'Arhiviraj',
+      form: {
+        name: 'Naziv turnira',
+        slug: 'URL oznaka (slug)',
+        subtitle: 'Podnaslov',
+        edition: 'Izdanje',
+        year: 'Godina',
+        startDate: 'Datum početka',
+        endDate: 'Datum završetka',
+        locationName: 'Lokacija',
+        fieldsLabel: 'Tereni (zarezom razdvojeno)',
+        qualifiersPerGroup: 'Prolaze iz grupe',
+        halves: 'Poluvremena',
+        halfMinutes: 'Trajanje poluvremena (min)',
+      },
+      activationNotice:
+        'Aktiviranjem ovog turnira prethodno aktivni turnir se arhivira.',
+    },
+
+    teams: {
+      title: 'Timovi',
+      newButton: 'Dodaj tim',
+      empty: 'Još nema timova. Dodaj prvi.',
+      form: {
+        name: 'Naziv tima',
+        shortName: 'Skraćenica (za nokaut)',
+        group: 'Grupa',
+        color: 'Boja (hex, opciono)',
+        captainName: 'Kapiten',
+      },
+    },
+
+    groups: {
+      title: 'Grupe',
+      newPlaceholder: 'npr. Grupa A',
+      addButton: 'Dodaj',
+      empty: 'Nema grupa — dodaj prvu iznad.',
+    },
   },
 
   match: {

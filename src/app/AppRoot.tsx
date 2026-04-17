@@ -1,7 +1,17 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 
 import { auth, db } from '@/lib/firebase';
 import { useAuthStore, type UserRole } from '@/stores/useAuthStore';
@@ -31,21 +41,34 @@ export function AppRoot() {
         claim === 'admin' || claim === 'reporter' ? claim : null;
 
       // Spark-plan fallback: without Cloud Functions we can't set a custom
-      // `admin` claim on login, so the client self-promotes by looking up
-      // its own email in /adminEmails. Safe because the Firestore rule only
-      // lets a signed-in user see their own entry.
+      // `admin` claim on login. Instead the client self-promotes by
+      //   1) looking up its own email in /adminEmails,
+      //   2) writing a /admins/{uid} doc so security rules can check
+      //      membership with a cheap exists() — no queries in rules.
       if (!role && user.email) {
         try {
-          const snap = await getDocs(
-            query(
-              collection(db, 'adminEmails'),
-              where('email', '==', user.email),
-              limit(1),
-            ),
-          );
-          if (!snap.empty) role = 'admin';
+          const existing = await getDoc(doc(db, 'admins', user.uid));
+          if (existing.exists()) {
+            role = 'admin';
+          } else {
+            const match = await getDocs(
+              query(
+                collection(db, 'adminEmails'),
+                where('email', '==', user.email),
+                limit(1),
+              ),
+            );
+            if (!match.empty) {
+              await setDoc(doc(db, 'admins', user.uid), {
+                email: user.email,
+                promotedAt: serverTimestamp(),
+              });
+              role = 'admin';
+            }
+          }
         } catch {
-          // Rule may not be deployed yet — ignore and leave role null.
+          // Rules may still be propagating; leave role null and let
+          // AuthGuard keep the user on /admin/login. They can retry.
         }
       }
 

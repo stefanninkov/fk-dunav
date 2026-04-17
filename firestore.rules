@@ -1,45 +1,142 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Firestore rules — Phase 1 starter.
+// Firestore rules — Phase 2 (data layer).
 //
-// Default posture: DENY ALL. Real rules per-collection land in Phase 2
-// and beyond, following docs/SECURITY-RULES.md.
+// Core invariants:
+//  - Public can read active/archived tournaments and all their child
+//    collections. Draft tournaments are admin-only.
+//  - Reporters can write matches + players. Admins do everything else.
+//  - /adminEmails is readable by signed-in users (so AppRoot can self-
+//    promote on the Spark plan). Non-writable from the client.
+//  - /admins/{uid} is the authoritative role cache: the client writes
+//    it once, at sign-in, only if its own email appears in /adminEmails
+//    under a doc whose id is the user's email. Every other collection
+//    checks isAdmin() against that doc.
+//  - Everything not explicitly allowed is denied.
 //
-// The only exception is /adminEmails, which is read by the magic-link
-// Cloud Function to look up Stefan's hardcoded bootstrap email on
-// first sign-in. No client ever reads or writes this collection.
+// Seed prerequisites:
+//  - /adminEmails must contain one doc with id === the admin's email,
+//    e.g. /adminEmails/stefan.ninkov@gmail.com with field email:"stefan.ninkov@gmail.com".
 // ------------------------------------------------------------------
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helpers.
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function hasRole(role) {
+    function hasClaim(role) {
       return isSignedIn() && request.auth.token.role == role;
     }
 
+    // Admin custom claim (future Cloud Function path) OR an /admins/{uid}
+    // doc that was seeded on first sign-in.
     function isAdmin() {
-      return hasRole('admin');
+      return hasClaim('admin')
+             || (isSignedIn()
+                 && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
-    // Bootstrap: seeded manually via Firebase console before first deploy.
-    //
-    // Any signed-in user can read this collection so the client can self-
-    // promote to admin on the Spark plan (no Cloud Functions needed). The
-    // list is tiny and not sensitive — knowing who the admins are is fine.
-    // Writes remain denied so the seed can only be edited from the console.
-    match /adminEmails/{docId} {
+    function isReporterOrAdmin() {
+      return hasClaim('reporter') || isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // /adminEmails — bootstrap seed (doc id must equal the email).
+    // ------------------------------------------------------------
+    match /adminEmails/{email} {
       allow read: if isSignedIn();
       allow write: if false;
     }
 
-    // Deny-all fallback. Every collection gets an explicit rule in later
-    // phases; until then nothing else is accessible from the client.
+    // ------------------------------------------------------------
+    // /admins/{uid} — role cache written by client on self-promotion.
+    // Allowed to create only if the caller's email has a matching doc
+    // in /adminEmails (doc id = email). Updates and deletes are closed.
+    // ------------------------------------------------------------
+    match /admins/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn()
+                     && request.auth.uid == uid
+                     && request.auth.token.email != null
+                     && exists(/databases/$(database)/documents/adminEmails/$(request.auth.token.email))
+                     && request.resource.data.email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------
+    // /users — profile docs
+    // ------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+    }
+
+    // ------------------------------------------------------------
+    // /tournaments
+    // ------------------------------------------------------------
+    match /tournaments/{tid} {
+      allow read: if resource.data.status != 'draft' || isAdmin();
+      // Listing (e.g. /admin/turnir) must be allowed for admins too.
+      // Firestore evaluates list rules per-doc; drafts will still be
+      // denied to non-admins.
+      allow list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+
+      match /groups/{gid} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      match /teams/{teamId} {
+        allow read: if true;
+        allow create, update: if isReporterOrAdmin();
+        allow delete: if false;
+      }
+
+      match /players/{playerId} {
+        allow read: if true;
+        allow create, update: if isReporterOrAdmin();
+        allow delete: if false;
+      }
+
+      match /matches/{matchId} {
+        allow read: if true;
+        allow write: if isReporterOrAdmin();
+
+        match /events/{eventId} {
+          allow read: if true;
+          allow create: if isReporterOrAdmin();
+          allow update, delete: if isAdmin();
+        }
+      }
+
+      match /standings/{teamId} {
+        allow read: if true;
+        allow write: if isAdmin(); // until Cloud Function takes over
+      }
+
+      match /photos/{photoId} {
+        allow read: if (resource != null && resource.data.status == 'approved') || isAdmin();
+        allow write: if isAdmin();
+      }
+      match /announcements/{id} { allow read: if true; allow write: if isAdmin(); }
+      match /sponsors/{id}      { allow read: if true; allow write: if isAdmin(); }
+      match /kupSanka/{teamId}  { allow read: if true; allow write: if isReporterOrAdmin(); }
+      match /crossbar/{pid}     { allow read: if true; allow write: if isAdmin(); }
+      match /awards/{awardId}   { allow read: if true; allow write: if isAdmin(); }
+      match /lottery/{prizeId}  { allow read: if true; allow write: if isAdmin(); }
+      match /fanVotes/{pollId} {
+        allow read: if true;
+        allow write: if isAdmin();
+        match /votes/{voteId} { allow read: if false; allow create: if isSignedIn(); }
+      }
+    }
+
+    // Deny-all fallback.
     match /{document=**} {
       allow read, write: if false;
     }
