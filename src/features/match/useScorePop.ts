@@ -40,13 +40,19 @@ export function useScorePop(score: number): React.RefObject<HTMLSpanElement | nu
     }
 
     if (soundEnabled) {
-      try {
-        const audio = new Audio(`${import.meta.env.BASE_URL}assets/goal-ping.mp3`);
-        audio.volume = 0.4;
-        void audio.play();
-      } catch {
-        /* noop — autoplay may be blocked */
-      }
+      // Try OGG first (smaller + open), fall back to MP3. Whichever file
+      // the user commits at /public/assets/goal-ping.{ogg,mp3} will play;
+      // if neither exists or autoplay is blocked, the catch keeps it silent.
+      const base = `${import.meta.env.BASE_URL}assets/goal-ping`;
+      const audio = new Audio();
+      audio.volume = 0.4;
+      audio.src = `${base}.ogg`;
+      audio.play().catch(() => {
+        audio.src = `${base}.mp3`;
+        audio.play().catch(() => {
+          /* both missing or autoplay blocked — silent */
+        });
+      });
     }
   }, [score, soundEnabled, reducedMotion]);
 
