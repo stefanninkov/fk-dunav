@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 
+import logoUrl from '@/assets/logo.svg';
 import { auth } from '@/lib/firebase';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -101,7 +102,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-surface-0 px-page-x">
       <div className="w-full max-w-md rounded-lg bg-surface-1 p-6 shadow-card">
         <div className="mb-6 flex items-center gap-3">
-          <img src="/assets/logo.svg" alt={sr.brand.name} className="h-12 w-12" />
+          <img src={logoUrl} alt={sr.brand.name} className="h-12 w-12" />
           <div className="flex flex-col">
             <h1 className="font-display text-xl font-700">{sr.admin.login.title}</h1>
             <p className="text-sm text-ink-tertiary">{sr.brand.name}</p>

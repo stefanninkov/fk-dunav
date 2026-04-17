@@ -19,6 +19,7 @@ import {
   LogOut,
 } from 'lucide-react';
 
+import logoUrl from '@/assets/logo.svg';
 import { auth } from '@/lib/firebase';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -59,7 +60,7 @@ export function AdminLayout() {
 
       <aside className="hidden w-60 shrink-0 flex-col border-r border-surface-4 bg-surface-1 lg:flex">
         <div className="flex items-center gap-3 border-b border-surface-4 px-4 py-4">
-          <img src="/assets/logo.svg" alt={sr.brand.name} className="h-10 w-10" />
+          <img src={logoUrl} alt={sr.brand.name} className="h-10 w-10" />
           <div className="flex flex-col">
             <span className="font-display text-sm font-600 leading-tight">{sr.brand.name}</span>
             <span className="text-xs text-ink-tertiary">Admin</span>

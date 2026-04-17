@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Volume2, VolumeX, Menu } from 'lucide-react';
 
+import logoUrl from '@/assets/logo.svg';
 import { sr } from '@/i18n/sr';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -26,7 +27,7 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b border-surface-4 bg-surface-0/90 backdrop-blur">
       <div className="mx-auto flex max-w-[1200px] items-center gap-4 px-page-x py-3 lg:px-page-x-lg">
         <NavLink to="/" className="flex items-center gap-3">
-          <img src="/assets/logo.svg" alt={sr.brand.name} className="h-10 w-10" />
+          <img src={logoUrl} alt={sr.brand.name} className="h-10 w-10" />
           <div className="hidden flex-col sm:flex">
             <span className="font-display text-base font-700 leading-tight">{sr.brand.name}</span>
             <span className="text-xs text-ink-secondary">{sr.brand.tournament}</span>
