@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Firestore rules — Phase 2 (data layer).
+// Firestore rules — Phase 2 (data layer). Re-deploy trigger.
 //
 // Core invariants:
 //  - Public can read active/archived tournaments and all their child
