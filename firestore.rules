@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// ------------------------------------------------------------------
+// Firestore rules — Week 1 starter.
+//
+// Default posture: DENY ALL. Real rules per-collection land in Week 2
+// and beyond, following docs/SECURITY-RULES.md.
+//
+// The only exception is /adminEmails, which is read by the magic-link
+// Cloud Function to look up Stefan's hardcoded bootstrap email on
+// first sign-in. No client ever reads or writes this collection.
+// ------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    // Bootstrap: only Cloud Functions (admin SDK) and the owner can touch
+    // this. Seeded manually via Firebase console before first deploy.
+    match /adminEmails/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Deny-all fallback. Every collection gets an explicit rule in later
+    // weeks; until then nothing else is accessible from the client.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

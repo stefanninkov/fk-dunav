@@ -1,0 +1,71 @@
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+
+import { AppRoot } from './AppRoot';
+import { PublicLayout } from '@/components/layout/PublicLayout';
+import { AdminLayout } from '@/components/layout/AdminLayout';
+
+import { HomePage } from '@/pages/public/HomePage';
+import { GroupsPage } from '@/pages/public/GroupsPage';
+import { SchedulePage } from '@/pages/public/SchedulePage';
+import { ResultsPage } from '@/pages/public/ResultsPage';
+import { LivePage } from '@/pages/public/LivePage';
+import { KnockoutPage } from '@/pages/public/KnockoutPage';
+import { StatisticsPage } from '@/pages/public/StatisticsPage';
+import { GalleryPage } from '@/pages/public/GalleryPage';
+import { TeamsPage } from '@/pages/public/TeamsPage';
+import { SponsorsPage } from '@/pages/public/SponsorsPage';
+import { RulesPage } from '@/pages/public/RulesPage';
+import { AboutPage } from '@/pages/public/AboutPage';
+import { ChampionsPage } from '@/pages/public/ChampionsPage';
+import { NotFoundPage } from '@/pages/public/NotFoundPage';
+
+import { LoginPage } from '@/pages/admin/LoginPage';
+import { AdminHomePage } from '@/pages/admin/AdminHomePage';
+
+import { AuthGuard } from '@/components/guards/AuthGuard';
+
+export const router = createBrowserRouter([
+  {
+    element: <AppRoot />,
+    children: [
+      {
+        element: <PublicLayout />,
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/grupe', element: <GroupsPage /> },
+          { path: '/raspored', element: <SchedulePage /> },
+          { path: '/rezultati', element: <ResultsPage /> },
+          { path: '/uzivo', element: <LivePage /> },
+          { path: '/nokaut', element: <KnockoutPage /> },
+          { path: '/statistika', element: <StatisticsPage /> },
+          { path: '/galerija', element: <GalleryPage /> },
+          { path: '/timovi', element: <TeamsPage /> },
+          { path: '/sponzori', element: <SponsorsPage /> },
+          { path: '/pravilnik', element: <RulesPage /> },
+          { path: '/o-turniru', element: <AboutPage /> },
+          { path: '/sampioni', element: <ChampionsPage /> },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+      {
+        path: '/admin/login',
+        element: <LoginPage />,
+      },
+      {
+        path: '/admin',
+        element: (
+          <AuthGuard>
+            <AdminLayout />
+          </AuthGuard>
+        ),
+        children: [
+          { index: true, element: <AdminHomePage /> },
+          // TODO(Week 2+): utakmice, timovi, igraci, raspored, galerija,
+          // obavestenja, sponzori, kup-sanka, precka, nagrade, turnir,
+          // korisnici, glasanje, sampioni.
+          { path: '*', element: <Navigate to="/admin" replace /> },
+        ],
+      },
+    ],
+  },
+]);

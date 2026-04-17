@@ -1,0 +1,40 @@
+name: Firebase deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'storage.rules'
+      - 'firebase.json'
+      - 'functions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install app deps
+        run: npm ci --legacy-peer-deps
+      - name: Install functions deps
+        run: npm --prefix functions ci
+      - name: Build functions
+        run: npm --prefix functions run build
+      - name: Deploy rules + functions
+        uses: w9jds/firebase-action@v14.2.0
+        with:
+          args: deploy --only firestore:rules,firestore:indexes,storage,functions --project fk-dunav
+        env:
+          # Create this secret with a Firebase service account key JSON
+          # (Firebase console → Project settings → Service accounts → Generate
+          # new private key). Store the full JSON as the secret value.
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

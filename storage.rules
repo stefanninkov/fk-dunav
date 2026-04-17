@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// ------------------------------------------------------------------
+// Storage rules — Week 1 starter.
+//
+// Default posture: DENY ALL. Real rules for uploads/approved/rejected,
+// team-logos, player-photos, sponsor-logos, og-cards, and tournament-
+// assets land alongside the photo-moderation work in Week 7.
+// ------------------------------------------------------------------
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -11,11 +11,25 @@ React 19 · Vite · TypeScript · Tailwind CSS v4 · Zustand · Firebase (Firest
 ## Quick start
 
 ```bash
-npm install
-cp .env.example .env.local           # fill in Firebase config
-npm run dev                          # Vite dev server
+npm install --legacy-peer-deps       # React 19 peer deps need this flag
+npm run dev                          # Vite dev server on http://localhost:5173
 firebase emulators:start             # Firebase services locally (separate terminal)
 ```
+
+The base `.env` file is committed with the public Firebase web config for the
+`fk-dunav` project. To override per environment, create `.env.local` (git-
+ignored). Set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.local` when running
+against the emulators.
+
+### Admin bootstrap (one-time, before first deploy)
+
+1. In Firebase console → Firestore, create a collection named `adminEmails`.
+2. Add one document with field `email: "stefan.ninkov@gmail.com"` (that's
+   the hardcoded sole day-one admin).
+3. After the magic-link Cloud Function ships (Week 1), Stefan's first sign-in
+   will pick up that doc and set his `admin` custom claim automatically.
+4. All other admins/reporters join later via `/admin/korisnici` — no more
+   manual console edits.
 
 ## Documentation
 

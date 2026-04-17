@@ -1,0 +1,38 @@
+{
+  "indexes": [
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "phase", "order": "ASCENDING" },
+      { "fieldPath": "scheduledStart", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "tournamentId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "matchId", "order": "ASCENDING" },
+      { "fieldPath": "deleted", "order": "ASCENDING" },
+      { "fieldPath": "minute", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "players", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "teamId", "order": "ASCENDING" },
+      { "fieldPath": "active", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "photos", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "photos", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "matchId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "standings", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "groupId", "order": "ASCENDING" },
+      { "fieldPath": "rank", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "pushSubscriptions", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "matchIds", "arrayConfig": "CONTAINS" },
+      { "fieldPath": "invalid", "order": "ASCENDING" }
+    ]}
+  ],
+  "fieldOverrides": []
+}
