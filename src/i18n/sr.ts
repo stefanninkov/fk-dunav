@@ -36,6 +36,7 @@ export const sr = {
     live: 'Uživo',
     knockout: 'Nokaut',
     statistics: 'Statistika',
+    awards: 'Nagrade',
     gallery: 'Galerija',
     teams: 'Timovi',
     sponsors: 'Sponzori',

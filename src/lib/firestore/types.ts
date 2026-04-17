@@ -347,7 +347,10 @@ export interface LotteryPrize {
   winnerName: string;
   winnerPhotoUrl?: string;
   order: number;
+  /** Has the admin pressed "Otkrij" for this prize yet? Public shows only revealed. */
+  revealed: boolean;
   awardedAt: Timestamp;
+  revealedAt?: Timestamp;
   createdBy: string;
 }
 

@@ -12,6 +12,7 @@ const navLinks = [
   { to: '/rezultati', label: sr.nav.results },
   { to: '/nokaut', label: sr.nav.knockout },
   { to: '/statistika', label: sr.nav.statistics },
+  { to: '/nagrade', label: sr.nav.awards },
   { to: '/galerija', label: sr.nav.gallery },
   { to: '/timovi', label: sr.nav.teams },
   { to: '/sponzori', label: sr.nav.sponsors },

@@ -1,5 +1,10 @@
-import { doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import { deleteDoc } from 'firebase/firestore';
+import {
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
 
 import { db } from '@/lib/firebase';
 import { lotteryCol, lotteryDoc } from '@/lib/firestore/refs';
@@ -12,6 +17,11 @@ export interface CreatePrizeInput {
   order: number;
 }
 
+/**
+ * New prizes land as `revealed: false` so the admin can stage the full list
+ * ahead of time and then gradually reveal them during the live draw. Public
+ * board + /lutrija big-screen view only show `revealed === true`.
+ */
 export async function createLotteryPrize(
   tournamentId: string,
   input: CreatePrizeInput,
@@ -24,6 +34,7 @@ export async function createLotteryPrize(
     winnerName: input.winnerName,
     winnerPhotoUrl: input.winnerPhotoUrl,
     order: input.order,
+    revealed: false,
     awardedAt: serverTimestamp(),
     createdBy,
   } as unknown as LotteryPrize);
@@ -38,6 +49,25 @@ export async function updateLotteryPrize(
 ): Promise<void> {
   await updateDoc(lotteryDoc(tournamentId, prizeId), {
     ...patch,
+  });
+}
+
+export async function revealLotteryPrize(
+  tournamentId: string,
+  prizeId: string,
+): Promise<void> {
+  await updateDoc(lotteryDoc(tournamentId, prizeId), {
+    revealed: true,
+    revealedAt: serverTimestamp(),
+  });
+}
+
+export async function hideLotteryPrize(
+  tournamentId: string,
+  prizeId: string,
+): Promise<void> {
+  await updateDoc(lotteryDoc(tournamentId, prizeId), {
+    revealed: false,
   });
 }
 

@@ -41,6 +41,8 @@ import { UsersPage as AdminUsersPage } from '@/pages/admin/UsersPage';
 import { VotingPage as AdminVotingPage } from '@/pages/admin/VotingPage';
 import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
 import { Archive2025Page } from '@/pages/public/Archive2025Page';
+import { PublicAwardsPage } from '@/pages/public/PublicAwardsPage';
+import { LotteryLivePage } from '@/pages/public/LotteryLivePage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
 
@@ -71,6 +73,8 @@ export const router = createBrowserRouter([
           { path: '/igrac/:playerId', element: <PlayerDetailPage /> },
           { path: '/utakmica/:matchId', element: <MatchDetailPage /> },
           { path: '/2025', element: <Archive2025Page /> },
+          { path: '/nagrade', element: <PublicAwardsPage /> },
+          { path: '/lutrija', element: <LotteryLivePage /> },
           { path: '/sponzori', element: <SponsorsPage /> },
           { path: '/pravilnik', element: <RulesPage /> },
           { path: '/o-turniru', element: <AboutPage /> },
