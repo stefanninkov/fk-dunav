@@ -12,6 +12,7 @@ import type {
   Group,
   LotteryPrize,
   Match,
+  MatchEvent,
   Player,
   Team,
   Tournament,
@@ -44,6 +45,7 @@ export const groupConverter       = makeConverter<Group>();
 export const teamConverter        = makeConverter<Team>();
 export const playerConverter      = makeConverter<Player>();
 export const matchConverter       = makeConverter<Match>();
+export const matchEventConverter  = makeConverter<MatchEvent>();
 export const lotteryPrizeConverter = makeConverter<LotteryPrize>();
 export const adminEmailConverter  = makeConverter<AdminEmail>();
 export const appUserConverter     = makeConverter<AppUser>();

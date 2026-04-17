@@ -17,6 +17,7 @@ import { auth, db } from '@/lib/firebase';
 import { useAuthStore, type UserRole } from '@/stores/useAuthStore';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useUIStore } from '@/stores/useUIStore';
+import { useActiveTournament } from '@/hooks/useActiveTournament';
 
 /**
  * Root layout. Wires global side effects: auth state hydration, online/
@@ -28,6 +29,7 @@ export function AppRoot() {
   const clearAuth = useAuthStore((s) => s.clear);
   const setOnline = useOfflineStore((s) => s.setOnline);
   const setReducedMotion = useUIStore((s) => s.setReducedMotion);
+  useActiveTournament();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {

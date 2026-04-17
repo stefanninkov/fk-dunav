@@ -23,7 +23,6 @@ import logoUrl from '@/assets/logo.svg';
 import { auth } from '@/lib/firebase';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useActiveTournament } from '@/hooks/useActiveTournament';
 import { OfflineBadge } from '@/components/ui/OfflineBadge';
 
 const navItems = [
@@ -49,7 +48,6 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const email = useAuthStore((s) => s.email);
   const role = useAuthStore((s) => s.role);
-  useActiveTournament();
 
   async function handleLogout() {
     await signOut(auth);

@@ -164,6 +164,51 @@ export interface Match {
 }
 
 // ---------------------------------------------------------------------------
+// Match events
+
+export type MatchEventType =
+  | 'matchStart'
+  | 'goal'
+  | 'yellowCard'
+  | 'redCard'
+  | 'substitution'
+  | 'halfEnd'
+  | 'halfStart'
+  | 'matchEnd'
+  | 'shootoutKick'
+  | 'abandoned';
+
+export interface MatchEvent {
+  id: string;
+  matchId: string;
+  clientEventId: string;
+  type: MatchEventType;
+  minute: number;
+  loggedAt: Timestamp;
+  serverTimestamp: Timestamp;
+
+  team?: 'a' | 'b';
+  playerId?: string;
+  playerName?: string;
+  assistPlayerId?: string;
+  assistPlayerName?: string;
+  ownGoal?: boolean;
+
+  subOffPlayerId?: string;
+  subOffPlayerName?: string;
+  subOnPlayerId?: string;
+  subOnPlayerName?: string;
+
+  shootoutKickNumber?: number;
+  shootoutScored?: boolean;
+
+  createdBy: string;
+  deleted: boolean;
+  deletedAt?: Timestamp;
+  deletedBy?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Lottery (Lutrija)
 
 export interface LotteryPrize {

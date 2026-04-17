@@ -13,6 +13,8 @@ import { KnockoutPage } from '@/pages/public/KnockoutPage';
 import { StatisticsPage } from '@/pages/public/StatisticsPage';
 import { GalleryPage } from '@/pages/public/GalleryPage';
 import { TeamsPage } from '@/pages/public/TeamsPage';
+import { TeamDetailPage } from '@/pages/public/TeamDetailPage';
+import { PlayerDetailPage } from '@/pages/public/PlayerDetailPage';
 import { SponsorsPage } from '@/pages/public/SponsorsPage';
 import { RulesPage } from '@/pages/public/RulesPage';
 import { AboutPage } from '@/pages/public/AboutPage';
@@ -25,6 +27,10 @@ import { TournamentPage } from '@/pages/admin/TournamentPage';
 import { TeamsPage as AdminTeamsPage } from '@/pages/admin/TeamsPage';
 import { PlayersPage as AdminPlayersPage } from '@/pages/admin/PlayersPage';
 import { SchedulePage as AdminSchedulePage } from '@/pages/admin/SchedulePage';
+import { AdminMatchesPage } from '@/pages/admin/AdminMatchesPage';
+import { AdminMatchEditorPage } from '@/pages/admin/AdminMatchEditorPage';
+import { AwardsPage as AdminAwardsPage } from '@/pages/admin/AwardsPage';
+import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
 
@@ -51,6 +57,9 @@ export const router = createBrowserRouter([
           { path: '/statistika', element: <StatisticsPage /> },
           { path: '/galerija', element: <GalleryPage /> },
           { path: '/timovi', element: <TeamsPage /> },
+          { path: '/tim/:teamId', element: <TeamDetailPage /> },
+          { path: '/igrac/:playerId', element: <PlayerDetailPage /> },
+          { path: '/utakmica/:matchId', element: <MatchDetailPage /> },
           { path: '/sponzori', element: <SponsorsPage /> },
           { path: '/pravilnik', element: <RulesPage /> },
           { path: '/o-turniru', element: <AboutPage /> },
@@ -75,6 +84,9 @@ export const router = createBrowserRouter([
           { path: 'timovi', element: <AdminTeamsPage /> },
           { path: 'igraci', element: <AdminPlayersPage /> },
           { path: 'raspored', element: <AdminSchedulePage /> },
+          { path: 'utakmice', element: <AdminMatchesPage /> },
+          { path: 'utakmice/:matchId', element: <AdminMatchEditorPage /> },
+          { path: 'nagrade', element: <AdminAwardsPage /> },
           // TODO(later phases): utakmice editor, galerija, obavestenja,
           // sponzori, kup-sanka, precka, nagrade, korisnici, glasanje,
           // sampioni.

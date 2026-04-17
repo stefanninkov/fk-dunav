@@ -12,6 +12,7 @@ import {
   groupConverter,
   lotteryPrizeConverter,
   matchConverter,
+  matchEventConverter,
   playerConverter,
   teamConverter,
   tournamentConverter,
@@ -22,6 +23,7 @@ import type {
   Group,
   LotteryPrize,
   Match,
+  MatchEvent,
   Player,
   Team,
   Tournament,
@@ -76,6 +78,29 @@ export const matchesCol = (tournamentId: string): CollectionReference<Match> =>
 
 export const matchDoc = (tournamentId: string, matchId: string): DocumentReference<Match> =>
   doc(db, 'tournaments', tournamentId, 'matches', matchId).withConverter(matchConverter);
+
+export const matchEventsCol = (
+  tournamentId: string,
+  matchId: string,
+): CollectionReference<MatchEvent> =>
+  collection(db, 'tournaments', tournamentId, 'matches', matchId, 'events').withConverter(
+    matchEventConverter,
+  );
+
+export const matchEventDoc = (
+  tournamentId: string,
+  matchId: string,
+  eventId: string,
+): DocumentReference<MatchEvent> =>
+  doc(
+    db,
+    'tournaments',
+    tournamentId,
+    'matches',
+    matchId,
+    'events',
+    eventId,
+  ).withConverter(matchEventConverter);
 
 export const lotteryCol = (tournamentId: string): CollectionReference<LotteryPrize> =>
   collection(db, 'tournaments', tournamentId, 'lottery').withConverter(lotteryPrizeConverter);
