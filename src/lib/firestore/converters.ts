@@ -8,12 +8,17 @@ import {
 
 import type {
   AdminEmail,
+  Announcement,
   AppUser,
+  Award,
+  CrossbarParticipant,
   Group,
+  KupSankaEntry,
   LotteryPrize,
   Match,
   MatchEvent,
   Player,
+  Sponsor,
   Team,
   Tournament,
 } from './types';
@@ -47,5 +52,10 @@ export const playerConverter      = makeConverter<Player>();
 export const matchConverter       = makeConverter<Match>();
 export const matchEventConverter  = makeConverter<MatchEvent>();
 export const lotteryPrizeConverter = makeConverter<LotteryPrize>();
-export const adminEmailConverter  = makeConverter<AdminEmail>();
-export const appUserConverter     = makeConverter<AppUser>();
+export const announcementConverter = makeConverter<Announcement>();
+export const sponsorConverter      = makeConverter<Sponsor>();
+export const kupSankaConverter     = makeConverter<KupSankaEntry>();
+export const crossbarConverter     = makeConverter<CrossbarParticipant>();
+export const awardConverter        = makeConverter<Award>();
+export const adminEmailConverter   = makeConverter<AdminEmail>();
+export const appUserConverter      = makeConverter<AppUser>();

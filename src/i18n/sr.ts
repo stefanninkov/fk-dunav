@@ -122,6 +122,76 @@ export const sr = {
       addButton: 'Dodaj',
       empty: 'Nema grupa — dodaj prvu iznad.',
     },
+
+    announcements: {
+      title: 'Obaveštenja',
+      newButton: 'Novo obaveštenje',
+      empty: 'Nema obaveštenja.',
+      severity: {
+        info: 'Info',
+        warning: 'Upozorenje',
+        urgent: 'Hitno',
+      },
+      form: {
+        title: 'Naslov',
+        body: 'Tekst (do 280 karaktera)',
+        severity: 'Nivo važnosti',
+        expiresAt: 'Ističe (opciono)',
+      },
+    },
+
+    sponsors: {
+      title: 'Sponzori',
+      newButton: 'Dodaj sponzora',
+      empty: 'Još nema sponzora.',
+      form: {
+        name: 'Naziv',
+        logoUrl: 'URL grba (opciono)',
+        link: 'Link (opciono)',
+        tier: 'Kategorija',
+        order: 'Redosled',
+        thanksText: 'Poruka zahvalnosti (opciono)',
+        active: 'Aktivan',
+      },
+      tier: {
+        gold: 'Zlatni',
+        silver: 'Srebrni',
+        bronze: 'Bronzani',
+        friend: 'Prijatelj',
+      },
+    },
+
+    kupSanka: {
+      title: 'Kup \u0160anka',
+      empty: 'Prvo dodaj timove.',
+    },
+
+    crossbar: {
+      title: 'Takmi\u010Denje u ga\u0111anju pre\u010Dke bosom nogom',
+      short: 'Pre\u010Dka',
+      newButton: 'Dodaj u\u010Desnika',
+      empty: 'Nema u\u010Desnika.',
+      form: {
+        name: 'Ime u\u010Desnika',
+        teamName: 'Tim (opciono)',
+        qualifyingScore: 'Pogo\u0111enih pre\u010Daka',
+        finalRank: 'Pozicija (1 = pobednik)',
+      },
+    },
+
+    awards: {
+      title: 'Nagrade',
+      saved: 'Sa\u010Duvano.',
+      ids: {
+        champion: '\u0160ampion',
+        runnerUp: 'Vice\u0161ampion',
+        thirdPlace: '3. mesto',
+        mvp: 'MVP turnira',
+        topScorer: 'Najbolji strelac',
+        teamOfTournament: 'Tim turnira',
+        crossbarWinner: 'Pobednik pre\u010Dke',
+      },
+    },
   },
 
   match: {

@@ -209,6 +209,90 @@ export interface MatchEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Announcement
+
+export type AnnouncementSeverity = 'info' | 'warning' | 'urgent';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  severity: AnnouncementSeverity;
+  publishedAt: Timestamp;
+  expiresAt?: Timestamp | null;
+  createdBy: string;
+  pushSent: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Sponsor
+
+export type SponsorTier = 'gold' | 'silver' | 'bronze' | 'friend';
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  link?: string;
+  tier: SponsorTier;
+  order: number;
+  thanksText?: string;
+  active: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Kup Šanka (beer mug leaderboard)
+
+export interface KupSankaEntry {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl?: string;
+  bokala: number;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+// ---------------------------------------------------------------------------
+// Crossbar competition
+
+export interface CrossbarParticipant {
+  id: string;
+  name: string;
+  teamId?: string;
+  teamName?: string;
+  qualifyingScore?: number;
+  finalRank?: number;
+  notes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Awards
+
+export type AwardId =
+  | 'champion'
+  | 'runnerUp'
+  | 'thirdPlace'
+  | 'mvp'
+  | 'topScorer'
+  | 'teamOfTournament'
+  | 'crossbarWinner';
+
+export type AwardEntityType = 'team' | 'player' | 'teamOfTournament';
+
+export interface Award {
+  id: string;
+  type: AwardEntityType;
+  teamId?: string;
+  teamName?: string;
+  playerId?: string;
+  playerName?: string;
+  playerPhotoUrl?: string;
+  teamOfTournamentPlayerIds?: string[];
+  description?: string;
+  awardedAt: Timestamp;
+}
+
+// ---------------------------------------------------------------------------
 // Lottery (Lutrija)
 
 export interface LotteryPrize {

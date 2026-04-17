@@ -8,23 +8,33 @@ import {
 import { db } from '@/lib/firebase';
 import {
   adminEmailConverter,
+  announcementConverter,
   appUserConverter,
+  awardConverter,
+  crossbarConverter,
   groupConverter,
+  kupSankaConverter,
   lotteryPrizeConverter,
   matchConverter,
   matchEventConverter,
   playerConverter,
+  sponsorConverter,
   teamConverter,
   tournamentConverter,
 } from './converters';
 import type {
   AdminEmail,
+  Announcement,
   AppUser,
+  Award,
+  CrossbarParticipant,
   Group,
+  KupSankaEntry,
   LotteryPrize,
   Match,
   MatchEvent,
   Player,
+  Sponsor,
   Team,
   Tournament,
 } from './types';
@@ -110,3 +120,56 @@ export const lotteryDoc = (
   prizeId: string,
 ): DocumentReference<LotteryPrize> =>
   doc(db, 'tournaments', tournamentId, 'lottery', prizeId).withConverter(lotteryPrizeConverter);
+
+export const announcementsCol = (
+  tournamentId: string,
+): CollectionReference<Announcement> =>
+  collection(db, 'tournaments', tournamentId, 'announcements').withConverter(
+    announcementConverter,
+  );
+
+export const announcementDoc = (
+  tournamentId: string,
+  id: string,
+): DocumentReference<Announcement> =>
+  doc(db, 'tournaments', tournamentId, 'announcements', id).withConverter(
+    announcementConverter,
+  );
+
+export const sponsorsCol = (tournamentId: string): CollectionReference<Sponsor> =>
+  collection(db, 'tournaments', tournamentId, 'sponsors').withConverter(sponsorConverter);
+
+export const sponsorDoc = (
+  tournamentId: string,
+  id: string,
+): DocumentReference<Sponsor> =>
+  doc(db, 'tournaments', tournamentId, 'sponsors', id).withConverter(sponsorConverter);
+
+export const kupSankaCol = (tournamentId: string): CollectionReference<KupSankaEntry> =>
+  collection(db, 'tournaments', tournamentId, 'kupSanka').withConverter(kupSankaConverter);
+
+export const kupSankaDoc = (
+  tournamentId: string,
+  teamId: string,
+): DocumentReference<KupSankaEntry> =>
+  doc(db, 'tournaments', tournamentId, 'kupSanka', teamId).withConverter(kupSankaConverter);
+
+export const crossbarCol = (
+  tournamentId: string,
+): CollectionReference<CrossbarParticipant> =>
+  collection(db, 'tournaments', tournamentId, 'crossbar').withConverter(crossbarConverter);
+
+export const crossbarDoc = (
+  tournamentId: string,
+  id: string,
+): DocumentReference<CrossbarParticipant> =>
+  doc(db, 'tournaments', tournamentId, 'crossbar', id).withConverter(crossbarConverter);
+
+export const awardsCol = (tournamentId: string): CollectionReference<Award> =>
+  collection(db, 'tournaments', tournamentId, 'awards').withConverter(awardConverter);
+
+export const awardDoc = (
+  tournamentId: string,
+  id: string,
+): DocumentReference<Award> =>
+  doc(db, 'tournaments', tournamentId, 'awards', id).withConverter(awardConverter);
