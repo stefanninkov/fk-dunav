@@ -2,7 +2,9 @@ name: Firebase deploy
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
     paths:
       - 'firestore.rules'
       - 'firestore.indexes.json'
@@ -26,7 +28,10 @@ jobs:
       - name: Install app deps
         run: npm ci --legacy-peer-deps
       - name: Install functions deps
-        run: npm --prefix functions ci
+        # functions/ doesn't have a package-lock.json committed yet, so
+        # `npm install` instead of `npm ci` until functions land in a phase
+        # that ships Cloud Functions with pinned deps.
+        run: npm --prefix functions install
       - name: Build functions
         run: npm --prefix functions run build
       - name: Deploy rules + functions
