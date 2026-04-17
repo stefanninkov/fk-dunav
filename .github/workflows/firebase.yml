@@ -27,19 +27,15 @@ jobs:
           cache: 'npm'
       - name: Install app deps
         run: npm ci --legacy-peer-deps
-      - name: Install functions deps
-        # functions/ doesn't have a package-lock.json committed yet, so
-        # `npm install` instead of `npm ci` until functions land in a phase
-        # that ships Cloud Functions with pinned deps.
-        run: npm --prefix functions install
-      - name: Build functions
-        run: npm --prefix functions run build
-      - name: Deploy rules + functions
+      - name: Deploy Firestore rules + indexes
+        # Storage + Cloud Functions are deferred to Phase 7 / Phase 5
+        # respectively — deploying them now hits a 403 because the
+        # service account doesn't have the Storage/Functions enable-API
+        # permissions and there aren't real functions or storage rules
+        # to ship yet. Add --only storage,functions here once those
+        # phases land and IAM is granted.
         uses: w9jds/firebase-action@v14.2.0
         with:
-          args: deploy --only firestore:rules,firestore:indexes,storage,functions --project fk-dunav
+          args: deploy --only firestore:rules,firestore:indexes --project fk-dunav
         env:
-          # Create this secret with a Firebase service account key JSON
-          # (Firebase console → Project settings → Service accounts → Generate
-          # new private key). Store the full JSON as the secret value.
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
