@@ -24,6 +24,13 @@ import { AdminHomePage } from '@/pages/admin/AdminHomePage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
 
+/**
+ * BASE_URL is the Vite build-time base path ('/fk-dunav/' on GitHub Pages
+ * project page, '/' in dev or on a custom domain). React Router needs this
+ * as basename so it strips the prefix when matching routes.
+ */
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
+
 export const router = createBrowserRouter([
   {
     element: <AppRoot />,
@@ -68,4 +75,4 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+], { basename });

@@ -2,7 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,11 @@ jobs:
         run: npm ci --legacy-peer-deps
       - name: Build
         run: npm run build
+      # GitHub Pages serves 404.html for any path it can't find. Copying
+      # index.html over it means deep links (e.g. /fk-dunav/uzivo) still
+      # boot the SPA and React Router picks up the path.
+      - name: SPA 404 fallback
+        run: cp dist/index.html dist/404.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

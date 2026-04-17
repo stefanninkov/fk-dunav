@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // GitHub Pages project page: https://stefanninkov.github.io/fk-dunav/.
+  // Custom domain (Week 9) will flip this back to '/' via env.
+  base: mode === 'production' ? (process.env.VITE_BASE_PATH ?? '/fk-dunav/') : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -18,4 +21,4 @@ export default defineConfig({
     sourcemap: true,
     target: 'es2022',
   },
-});
+}));
