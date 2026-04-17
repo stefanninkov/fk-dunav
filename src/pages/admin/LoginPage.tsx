@@ -78,15 +78,22 @@ export function LoginPage() {
   async function onSubmit({ email }: FormValues) {
     setError(null);
     try {
+      // Continue URL must match an Authorized Domain in Firebase Auth and
+      // include the full path under the Vite base (/fk-dunav/ on GH Pages).
+      const continueUrl = `${window.location.origin}${import.meta.env.BASE_URL}admin/login`;
       await sendSignInLinkToEmail(auth, email, {
-        url: `${window.location.origin}/admin/login`,
+        url: continueUrl,
         handleCodeInApp: true,
       });
       window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, email);
       setSent(true);
     } catch (e) {
       const code = e instanceof FirebaseError ? e.code : 'unknown';
-      setError(code === 'auth/invalid-email' ? sr.common.required : sr.admin.login.noAccess);
+      setError(
+        code === 'auth/invalid-email'
+          ? sr.common.required
+          : `${sr.admin.login.noAccess} (${code})`,
+      );
     }
   }
 

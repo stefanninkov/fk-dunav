@@ -27,10 +27,15 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
-    // Bootstrap: only Cloud Functions (admin SDK) and the owner can touch
-    // this. Seeded manually via Firebase console before first deploy.
+    // Bootstrap: seeded manually via Firebase console before first deploy.
+    //
+    // Any signed-in user can read this collection so the client can self-
+    // promote to admin on the Spark plan (no Cloud Functions needed). The
+    // list is tiny and not sensitive — knowing who the admins are is fine.
+    // Writes remain denied so the seed can only be edited from the console.
     match /adminEmails/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // Deny-all fallback. Every collection gets an explicit rule in later

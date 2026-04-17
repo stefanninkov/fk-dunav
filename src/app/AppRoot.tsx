@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 
-import { auth } from '@/lib/firebase';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { auth, db } from '@/lib/firebase';
+import { useAuthStore, type UserRole } from '@/stores/useAuthStore';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -26,7 +27,28 @@ export function AppRoot() {
       }
       const token = await user.getIdTokenResult();
       const claim = token.claims.role;
-      const role = claim === 'admin' || claim === 'reporter' ? claim : null;
+      let role: UserRole =
+        claim === 'admin' || claim === 'reporter' ? claim : null;
+
+      // Spark-plan fallback: without Cloud Functions we can't set a custom
+      // `admin` claim on login, so the client self-promotes by looking up
+      // its own email in /adminEmails. Safe because the Firestore rule only
+      // lets a signed-in user see their own entry.
+      if (!role && user.email) {
+        try {
+          const snap = await getDocs(
+            query(
+              collection(db, 'adminEmails'),
+              where('email', '==', user.email),
+              limit(1),
+            ),
+          );
+          if (!snap.empty) role = 'admin';
+        } catch {
+          // Rule may not be deployed yet — ignore and leave role null.
+        }
+      }
+
       setUser({ uid: user.uid, email: user.email, role });
     });
     return unsub;
