@@ -12,6 +12,7 @@ import { MarkdownView } from '@/features/content/components/MarkdownView';
 const pages: { id: ContentPageId; label: string; defaultTitle: string }[] = [
   { id: 'pravilnik', label: 'Pravilnik', defaultTitle: 'Pravilnik turnira' },
   { id: 'oTurniru', label: 'O turniru', defaultTitle: 'O turniru' },
+  { id: 'archive2025', label: '/2025 arhiva', defaultTitle: 'Turnir 2025' },
 ];
 
 export function ContentAdminPage() {

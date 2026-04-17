@@ -244,7 +244,7 @@ export interface Photo {
 // ---------------------------------------------------------------------------
 // Content page (admin-editable markdown: /pravilnik, /o-turniru)
 
-export type ContentPageId = 'pravilnik' | 'oTurniru';
+export type ContentPageId = 'pravilnik' | 'oTurniru' | 'archive2025';
 
 export interface ContentPage {
   id: ContentPageId;
@@ -368,6 +368,51 @@ export interface AppUser {
   createdAt: Timestamp;
   lastLogin: Timestamp;
   notes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Invite (email → role grant on first sign-in)
+
+export type InviteRole = 'reporter' | 'admin';
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: InviteRole;
+  invitedBy: string;
+  invitedAt: Timestamp;
+  consumedAt?: Timestamp;
+  consumedByUid?: string;
+  revoked: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Fan vote poll
+
+export type FanPollId = 'mvp' | 'bestGoal';
+export type FanPollStatus = 'open' | 'closed';
+
+export interface FanPollCandidate {
+  id: string;
+  label: string;
+  imageUrl?: string;
+  voteCount: number;
+}
+
+export interface FanPoll {
+  id: FanPollId;
+  title: string;
+  status: FanPollStatus;
+  openedAt?: Timestamp;
+  closesAt?: Timestamp;
+  candidates: FanPollCandidate[];
+}
+
+export interface FanVote {
+  id: string;
+  deviceId: string;
+  candidateId: string;
+  createdAt: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

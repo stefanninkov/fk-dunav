@@ -13,6 +13,8 @@ import {
   awardConverter,
   contentPageConverter,
   crossbarConverter,
+  fanPollConverter,
+  inviteConverter,
   groupConverter,
   kupSankaConverter,
   lotteryPrizeConverter,
@@ -33,6 +35,9 @@ import type {
   ContentPage,
   ContentPageId,
   CrossbarParticipant,
+  FanPoll,
+  FanPollId,
+  Invite,
   Group,
   KupSankaEntry,
   LotteryPrize,
@@ -70,6 +75,22 @@ export const usersCol = (): CollectionReference<AppUser> =>
 
 export const userDoc = (uid: string): DocumentReference<AppUser> =>
   doc(db, 'users', uid).withConverter(appUserConverter);
+
+export const invitesCol = (): CollectionReference<Invite> =>
+  collection(db, 'invites').withConverter(inviteConverter);
+
+export const inviteDoc = (id: string): DocumentReference<Invite> =>
+  doc(db, 'invites', id).withConverter(inviteConverter);
+
+// Fan votes are tournament-scoped; one doc per poll id (mvp, bestGoal).
+export const fanPollsCol = (tournamentId: string): CollectionReference<FanPoll> =>
+  collection(db, 'tournaments', tournamentId, 'fanVotes').withConverter(fanPollConverter);
+
+export const fanPollDoc = (
+  tournamentId: string,
+  pollId: FanPollId,
+): DocumentReference<FanPoll> =>
+  doc(db, 'tournaments', tournamentId, 'fanVotes', pollId).withConverter(fanPollConverter);
 
 // Tournament-scoped
 export const groupsCol = (tournamentId: string): CollectionReference<Group> =>

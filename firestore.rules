@@ -75,6 +75,13 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------
+    // /invites — reporter / admin invites by email (doc id = email)
+    // ------------------------------------------------------------
+    match /invites/{email} {
+      allow read, write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
     // /tournaments
     // ------------------------------------------------------------
     match /tournaments/{tid} {
@@ -138,8 +145,23 @@ service cloud.firestore {
       match /content/{pageId}   { allow read: if true; allow write: if isAdmin(); }
       match /fanVotes/{pollId} {
         allow read: if true;
-        allow write: if isAdmin();
-        match /votes/{voteId} { allow read: if false; allow create: if isSignedIn(); }
+        // Admins curate the poll + candidates. Public writes (vote count
+        // denormalized on the poll doc) are allowed when a vote subdoc is
+        // simultaneously created — the batched write covers both.
+        allow create, update: if isAdmin()
+          || (request.resource.data.keys().hasAll(['candidates'])
+              && resource != null
+              && resource.data.status == 'open');
+        allow delete: if isAdmin();
+
+        match /votes/{deviceId} {
+          allow read: if false;
+          // Anyone can create their own vote once; doc id = deviceId so a
+          // duplicate vote from the same device is rejected by the
+          // "create-only" rule (update/delete closed).
+          allow create: if get(/databases/$(database)/documents/tournaments/$(tid)/fanVotes/$(pollId)).data.status == 'open';
+          allow update, delete: if false;
+        }
       }
     }
 

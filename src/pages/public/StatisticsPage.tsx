@@ -4,6 +4,7 @@ import { onSnapshot, orderBy, query } from 'firebase/firestore';
 import {
   awardsCol,
   crossbarCol,
+  fanPollsCol,
   kupSankaCol,
   lotteryCol,
 } from '@/lib/firestore/refs';
@@ -11,12 +12,14 @@ import type {
   Award,
   AwardId,
   CrossbarParticipant,
+  FanPoll,
   KupSankaEntry,
   LotteryPrize,
 } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { LotteryBoard } from '@/features/lottery/components/LotteryBoard';
+import { FanPollCard } from '@/features/voting/components/FanPollCard';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
 
 const awardOrder: AwardId[] = [
@@ -35,6 +38,7 @@ export function StatisticsPage() {
   const [awards, setAwards] = useState<Record<string, Award>>({});
   const [kupSanka, setKupSanka] = useState<KupSankaEntry[]>([]);
   const [crossbar, setCrossbar] = useState<CrossbarParticipant[]>([]);
+  const [polls, setPolls] = useState<FanPoll[]>([]);
 
   useEffect(() => {
     if (!active) return;
@@ -58,11 +62,15 @@ export function StatisticsPage() {
       query(crossbarCol(active.id), orderBy('finalRank', 'asc')),
       (snap) => setCrossbar(snap.docs.map((d) => d.data())),
     );
+    const unsubPolls = onSnapshot(fanPollsCol(active.id), (snap) =>
+      setPolls(snap.docs.map((d) => d.data())),
+    );
     return () => {
       unsubL();
       unsubA();
       unsubK();
       unsubC();
+      unsubPolls();
     };
   }, [active]);
 
@@ -172,6 +180,20 @@ export function StatisticsPage() {
           <p className="mb-3 text-sm text-ink-tertiary">{sr.side.lottery.subtitle}</p>
           <LotteryBoard prizes={lottery} />
         </section>
+
+        {polls.length > 0 ? (
+          <section className="lg:col-span-2">
+            <h2 className="mb-1 font-display text-xl font-600">Glasanje navijača</h2>
+            <p className="mb-3 text-sm text-ink-tertiary">
+              Jedan glas po uređaju — birajte dok su ankete otvorene.
+            </p>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {polls.map((p) => (
+                <FanPollCard key={p.id} tournamentId={active.id} poll={p} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </section>
   );

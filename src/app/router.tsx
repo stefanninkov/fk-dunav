@@ -37,7 +37,10 @@ import { KupSankaPage as AdminKupSankaPage } from '@/pages/admin/KupSankaPage';
 import { CrossbarPage as AdminCrossbarPage } from '@/pages/admin/CrossbarPage';
 import { ContentAdminPage } from '@/pages/admin/ContentPage';
 import { AdminGalleryPage } from '@/pages/admin/AdminGalleryPage';
+import { UsersPage as AdminUsersPage } from '@/pages/admin/UsersPage';
+import { VotingPage as AdminVotingPage } from '@/pages/admin/VotingPage';
 import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
+import { Archive2025Page } from '@/pages/public/Archive2025Page';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
 
@@ -67,6 +70,7 @@ export const router = createBrowserRouter([
           { path: '/tim/:teamId', element: <TeamDetailPage /> },
           { path: '/igrac/:playerId', element: <PlayerDetailPage /> },
           { path: '/utakmica/:matchId', element: <MatchDetailPage /> },
+          { path: '/2025', element: <Archive2025Page /> },
           { path: '/sponzori', element: <SponsorsPage /> },
           { path: '/pravilnik', element: <RulesPage /> },
           { path: '/o-turniru', element: <AboutPage /> },
@@ -101,6 +105,8 @@ export const router = createBrowserRouter([
           { path: 'precka', element: <AdminCrossbarPage /> },
           { path: 'sadrzaj', element: <ContentAdminPage /> },
           { path: 'galerija', element: <AdminGalleryPage /> },
+          { path: 'korisnici', element: <AdminUsersPage /> },
+          { path: 'glasanje', element: <AdminVotingPage /> },
           // TODO(later phases): utakmice editor, galerija, obavestenja,
           // sponzori, kup-sanka, precka, nagrade, korisnici, glasanje,
           // sampioni.

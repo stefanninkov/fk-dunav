@@ -37,13 +37,32 @@ const bucket = admin.storage().bucket();
 export const promoteAdminOnLogin = beforeUserSignedIn(
   { region: 'europe-west3' },
   async (event) => {
-    const email = event.data?.email;
+    const email = event.data?.email?.toLowerCase();
     if (!email) return {};
+
+    // 1. Hardcoded day-one admin: /adminEmails/{email}.
     const seed = await db.collection('adminEmails').doc(email).get();
-    if (!seed.exists) return {};
-    return {
-      customClaims: { role: 'admin' },
-    };
+    if (seed.exists) {
+      return { customClaims: { role: 'admin' } };
+    }
+
+    // 2. Invited users: /invites/{email} with role='admin' | 'reporter'.
+    const inviteRef = db.collection('invites').doc(email);
+    const invite = await inviteRef.get();
+    const data = invite.data();
+    if (
+      invite.exists &&
+      !data?.revoked &&
+      (data?.role === 'admin' || data?.role === 'reporter')
+    ) {
+      await inviteRef.update({
+        consumedAt: FieldValue.serverTimestamp(),
+        consumedByUid: event.data?.uid,
+      });
+      return { customClaims: { role: data.role } };
+    }
+
+    return {};
   },
 );
 

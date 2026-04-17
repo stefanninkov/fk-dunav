@@ -13,6 +13,8 @@ import type {
   Award,
   ContentPage,
   CrossbarParticipant,
+  FanPoll,
+  Invite,
   Photo,
   Group,
   KupSankaEntry,
@@ -65,3 +67,5 @@ export const adminEmailConverter   = makeConverter<AdminEmail>();
 export const appUserConverter      = makeConverter<AppUser>();
 export const pushSubscriptionConverter = makeConverter<PushSubscription>();
 export const contentPageConverter  = makeConverter<ContentPage>();
+export const inviteConverter       = makeConverter<Invite>();
+export const fanPollConverter      = makeConverter<FanPoll>();
