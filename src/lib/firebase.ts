@@ -14,6 +14,11 @@ import {
 } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
+import {
+  getMessaging,
+  isSupported as isMessagingSupported,
+  type Messaging,
+} from 'firebase/messaging';
 
 /**
  * Firebase config is read from Vite env vars (VITE_FIREBASE_*). The values
@@ -63,4 +68,18 @@ if (!useEmulators && import.meta.env.PROD && firebaseConfig.measurementId) {
   void isAnalyticsSupported().then((supported) => {
     if (supported) analytics = getAnalytics(firebaseApp);
   });
+}
+
+/**
+ * Messaging is also async-gated because it's only supported in secure
+ * contexts with a Service Worker available. Consumers (FollowMatchButton)
+ * import `getMessagingIfSupported` and skip gracefully when it returns null.
+ */
+export async function getMessagingIfSupported(): Promise<Messaging | null> {
+  try {
+    const supported = await isMessagingSupported();
+    return supported ? getMessaging(firebaseApp) : null;
+  } catch {
+    return null;
+  }
 }

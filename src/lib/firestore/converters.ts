@@ -18,6 +18,7 @@ import type {
   Match,
   MatchEvent,
   Player,
+  PushSubscription,
   Sponsor,
   Team,
   Tournament,
@@ -59,3 +60,4 @@ export const crossbarConverter     = makeConverter<CrossbarParticipant>();
 export const awardConverter        = makeConverter<Award>();
 export const adminEmailConverter   = makeConverter<AdminEmail>();
 export const appUserConverter      = makeConverter<AppUser>();
+export const pushSubscriptionConverter = makeConverter<PushSubscription>();

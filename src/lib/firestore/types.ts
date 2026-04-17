@@ -323,3 +323,17 @@ export interface AppUser {
   lastLogin: Timestamp;
   notes?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Push subscription
+
+export interface PushSubscription {
+  token: string;
+  deviceId: string;
+  matchIds: string[];
+  subscribedToBroadcasts: boolean;
+  userAgent: string;
+  createdAt: Timestamp;
+  lastSeenAt: Timestamp;
+  invalid: boolean;
+}

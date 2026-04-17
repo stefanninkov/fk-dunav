@@ -18,6 +18,7 @@ import {
   matchConverter,
   matchEventConverter,
   playerConverter,
+  pushSubscriptionConverter,
   sponsorConverter,
   teamConverter,
   tournamentConverter,
@@ -34,6 +35,7 @@ import type {
   Match,
   MatchEvent,
   Player,
+  PushSubscription,
   Sponsor,
   Team,
   Tournament,
@@ -173,3 +175,14 @@ export const awardDoc = (
   id: string,
 ): DocumentReference<Award> =>
   doc(db, 'tournaments', tournamentId, 'awards', id).withConverter(awardConverter);
+
+// Top-level push subscriptions. Doc id = FCM registration token; the token
+// is always unique per device, so using it as the id means the client can
+// idempotently upsert its own subscription doc via setDoc+merge.
+export const pushSubscriptionsCol = (): CollectionReference<PushSubscription> =>
+  collection(db, 'pushSubscriptions').withConverter(pushSubscriptionConverter);
+
+export const pushSubscriptionDoc = (
+  token: string,
+): DocumentReference<PushSubscription> =>
+  doc(db, 'pushSubscriptions', token).withConverter(pushSubscriptionConverter);

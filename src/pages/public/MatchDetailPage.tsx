@@ -7,6 +7,8 @@ import type { Match, MatchEvent } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
+import { FollowMatchButton } from '@/features/push/FollowMatchButton';
+import { useScorePop } from '@/features/match/useScorePop';
 
 export function MatchDetailPage() {
   const { matchId } = useParams<{ matchId: string }>();
@@ -43,6 +45,25 @@ export function MatchDetailPage() {
   const live = match.status === 'live';
   const finished = match.status === 'finished';
 
+  return <MatchDetailBody match={match} events={events} live={live} finished={finished} matchId={matchId!} />;
+}
+
+function MatchDetailBody({
+  match,
+  events,
+  live,
+  finished,
+  matchId,
+}: {
+  match: Match;
+  events: MatchEvent[];
+  live: boolean;
+  finished: boolean;
+  matchId: string;
+}) {
+  const scoreARef = useScorePop(match.score.a);
+  const scoreBRef = useScorePop(match.score.b);
+
   return (
     <section className="mx-auto max-w-[900px] px-page-x py-10 lg:px-page-x-lg">
       <NavLink to="/uzivo" className="text-sm text-ink-secondary hover:text-ink-primary">
@@ -69,7 +90,13 @@ export function MatchDetailPage() {
             {match.teamA.name}
           </NavLink>
           <span className="tnum font-display text-5xl font-700 text-ink-primary sm:text-6xl">
-            {match.score.a}:{match.score.b}
+            <span ref={scoreARef} className="inline-block">
+              {match.score.a}
+            </span>
+            :
+            <span ref={scoreBRef} className="inline-block">
+              {match.score.b}
+            </span>
           </span>
           <NavLink
             to={`/tim/${match.teamB.teamId}`}
@@ -94,6 +121,12 @@ export function MatchDetailPage() {
           })}{' '}
           · {match.field}
         </p>
+
+        {live ? (
+          <div className="mt-4 flex justify-center">
+            <FollowMatchButton matchId={matchId} />
+          </div>
+        ) : null}
       </header>
 
       <section className="mt-8">

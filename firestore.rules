@@ -136,6 +136,16 @@ service cloud.firestore {
       }
     }
 
+    // Anonymous push subscriptions — id is the FCM registration token.
+    // Any visitor can create/update their own subscription (no auth
+    // required, rate-limited by App Check in practice). Reads are only
+    // for Cloud Functions via the Admin SDK; clients never list this.
+    match /pushSubscriptions/{token} {
+      allow read: if false;
+      allow create, update: if request.resource.data.token == token;
+      allow delete: if false;
+    }
+
     // Deny-all fallback.
     match /{document=**} {
       allow read, write: if false;
