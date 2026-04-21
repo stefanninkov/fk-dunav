@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
 
-import { awardsCol, lotteryCol, playersCol, teamsCol } from '@/lib/firestore/refs';
+import {
+  awardsCol,
+  lotteryCol,
+  lotteryParticipantsCol,
+  playersCol,
+  teamsCol,
+} from '@/lib/firestore/refs';
 import type {
   Award,
   AwardId,
+  LotteryParticipant,
   LotteryPrize,
   Player,
   Team,
@@ -28,6 +35,7 @@ export function AwardsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [awards, setAwards] = useState<Record<string, Award>>({});
   const [prizes, setPrizes] = useState<LotteryPrize[]>([]);
+  const [participants, setParticipants] = useState<LotteryParticipant[]>([]);
 
   useEffect(() => {
     if (!active) return;
@@ -48,11 +56,15 @@ export function AwardsPage() {
       query(lotteryCol(active.id), orderBy('order', 'asc')),
       (snap) => setPrizes(snap.docs.map((d) => d.data())),
     );
+    const unsubPart = onSnapshot(lotteryParticipantsCol(active.id), (snap) =>
+      setParticipants(snap.docs.map((d) => d.data())),
+    );
     return () => {
       unsubT();
       unsubP();
       unsubA();
       unsubL();
+      unsubPart();
     };
   }, [active]);
 
@@ -122,7 +134,12 @@ export function AwardsPage() {
         ))}
       </section>
 
-      <LotteryBoardEditor tournamentId={active.id} prizes={prizes} createdBy={uid} />
+      <LotteryBoardEditor
+        tournamentId={active.id}
+        participants={participants}
+        prizes={prizes}
+        createdBy={uid}
+      />
     </section>
   );
 }

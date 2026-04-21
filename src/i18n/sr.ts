@@ -217,14 +217,30 @@ export const sr = {
   side: {
     lottery: {
       title: 'Lutrija',
-      subtitle: 'Dobitnici nagradne igre',
-      empty: 'Dobitnici će biti objavljeni nakon izvlačenja.',
+      subtitle: 'Nagradno izvlačenje',
+      empty: 'Dobitnici će biti objavljeni tokom izvlačenja.',
+      pending: 'Čeka se izvlačenje',
+      drawing: 'Izvlačenje u toku…',
       admin: {
-        title: 'Lutrija — unos dobitnika',
-        addPrize: 'Dodaj dobitnika',
+        title: 'Lutrija',
+        participantsTitle: 'Učesnici',
+        participantsHelp:
+          'Unesi sve učesnike u bubanj. Tokom izvlačenja se nagrade pridružuju nasumičnim učesnicima — unapred se ne biraju dobitnici.',
+        addParticipant: 'Dodaj učesnika',
+        participantNamePlaceholder: 'Ime i prezime',
+        participantNotePlaceholder: 'Napomena (opciono)',
+        prizesTitle: 'Nagrade',
+        prizesHelp: 'Dodaj nagrade redom kojim će se izvlačiti.',
+        addPrize: 'Dodaj nagradu',
         labelPlaceholder: 'npr. 1. nagrada: TV',
-        winnerPlaceholder: 'Ime i prezime dobitnika',
-        photoOptional: 'Fotografija (opciono)',
+        draw: 'Izvuci',
+        drawn: 'Izvučeno',
+        undraw: 'Poništi izvlačenje',
+        openBigScreen: 'Otvori veliki ekran',
+        poolSummary: (remaining: number, total: number) =>
+          `U bubnju: ${remaining} / ${total} učesnika`,
+        noParticipants: 'Prvo dodaj učesnike.',
+        confirmUndraw: 'Poništiti izvlačenje za ovu nagradu?',
       },
     },
     crossbar: {

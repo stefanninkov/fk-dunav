@@ -340,17 +340,34 @@ export interface Award {
 
 // ---------------------------------------------------------------------------
 // Lottery (Lutrija)
+//
+// Two collections:
+//  - /tournaments/{tid}/lotteryParticipants/{pid}  — pool of people in the raffle
+//  - /tournaments/{tid}/lottery/{prizeId}          — prizes, with winner set at draw
+//
+// Draw flow: admin enters participants + prizes ahead of time, then during the
+// live event clicks "Izvuci" on a prize. The action picks a random participant
+// not yet assigned to any other prize and writes {winnerParticipantId, winnerName,
+// drawnAt} onto the prize doc. The public /lutrija page watches for new winners
+// and plays a shuffle animation that settles on the name.
+
+export interface LotteryParticipant {
+  id: string;
+  name: string;
+  note?: string;
+  createdAt: Timestamp;
+  createdBy: string;
+}
 
 export interface LotteryPrize {
   id: string;
   label: string;
-  winnerName: string;
-  winnerPhotoUrl?: string;
   order: number;
-  /** Has the admin pressed "Otkrij" for this prize yet? Public shows only revealed. */
-  revealed: boolean;
-  awardedAt: Timestamp;
-  revealedAt?: Timestamp;
+  /** Denormalized participant id/name written when the admin draws. Absent => not drawn. */
+  winnerParticipantId?: string;
+  winnerName?: string;
+  drawnAt?: Timestamp;
+  createdAt: Timestamp;
   createdBy: string;
 }
 

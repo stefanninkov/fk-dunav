@@ -142,6 +142,7 @@ service cloud.firestore {
       match /crossbar/{pid}     { allow read: if true; allow write: if isAdmin(); }
       match /awards/{awardId}   { allow read: if true; allow write: if isAdmin(); }
       match /lottery/{prizeId}  { allow read: if true; allow write: if isAdmin(); }
+      match /lotteryParticipants/{pid} { allow read: if true; allow write: if isAdmin(); }
       match /content/{pageId}   { allow read: if true; allow write: if isAdmin(); }
       match /fanVotes/{pollId} {
         allow read: if true;

@@ -17,6 +17,7 @@ import {
   inviteConverter,
   groupConverter,
   kupSankaConverter,
+  lotteryParticipantConverter,
   lotteryPrizeConverter,
   matchConverter,
   matchEventConverter,
@@ -40,6 +41,7 @@ import type {
   Invite,
   Group,
   KupSankaEntry,
+  LotteryParticipant,
   LotteryPrize,
   Match,
   MatchEvent,
@@ -148,6 +150,21 @@ export const lotteryDoc = (
   prizeId: string,
 ): DocumentReference<LotteryPrize> =>
   doc(db, 'tournaments', tournamentId, 'lottery', prizeId).withConverter(lotteryPrizeConverter);
+
+export const lotteryParticipantsCol = (
+  tournamentId: string,
+): CollectionReference<LotteryParticipant> =>
+  collection(db, 'tournaments', tournamentId, 'lotteryParticipants').withConverter(
+    lotteryParticipantConverter,
+  );
+
+export const lotteryParticipantDoc = (
+  tournamentId: string,
+  participantId: string,
+): DocumentReference<LotteryParticipant> =>
+  doc(db, 'tournaments', tournamentId, 'lotteryParticipants', participantId).withConverter(
+    lotteryParticipantConverter,
+  );
 
 export const announcementsCol = (
   tournamentId: string,

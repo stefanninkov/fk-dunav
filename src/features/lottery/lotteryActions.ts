@@ -1,74 +1,72 @@
 import {
   deleteDoc,
+  deleteField,
   doc,
+  getDocs,
   serverTimestamp,
   updateDoc,
-  writeBatch,
 } from 'firebase/firestore';
 
-import { db } from '@/lib/firebase';
-import { lotteryCol, lotteryDoc } from '@/lib/firestore/refs';
-import type { LotteryPrize } from '@/lib/firestore/types';
+import {
+  lotteryCol,
+  lotteryDoc,
+  lotteryParticipantDoc,
+  lotteryParticipantsCol,
+} from '@/lib/firestore/refs';
+import type { LotteryParticipant, LotteryPrize } from '@/lib/firestore/types';
+import { setDoc } from 'firebase/firestore';
 
-export interface CreatePrizeInput {
-  label: string;
-  winnerName: string;
-  winnerPhotoUrl?: string;
-  order: number;
+// ---------------------------------------------------------------------------
+// Participants — the raffle pool. Admin enters names upfront; the live draw
+// picks random unassigned participants and writes them onto prize docs.
+
+export async function createLotteryParticipant(
+  tournamentId: string,
+  input: { name: string; note?: string },
+  createdBy: string,
+): Promise<string> {
+  const ref = doc(lotteryParticipantsCol(tournamentId));
+  await setDoc(ref, {
+    name: input.name.trim(),
+    note: input.note?.trim() || undefined,
+    createdAt: serverTimestamp(),
+    createdBy,
+  } as unknown as LotteryParticipant);
+  return ref.id;
 }
 
-/**
- * New prizes land as `revealed: false` so the admin can stage the full list
- * ahead of time and then gradually reveal them during the live draw. Public
- * board + /lutrija big-screen view only show `revealed === true`.
- */
+export async function deleteLotteryParticipant(
+  tournamentId: string,
+  participantId: string,
+): Promise<void> {
+  await deleteDoc(lotteryParticipantDoc(tournamentId, participantId));
+}
+
+// ---------------------------------------------------------------------------
+// Prizes — the items being drawn. Created empty (no winner); `drawLotteryWinner`
+// mutates them to record the winner during the live event.
+
 export async function createLotteryPrize(
   tournamentId: string,
-  input: CreatePrizeInput,
+  input: { label: string; order: number },
   createdBy: string,
 ): Promise<string> {
   const ref = doc(lotteryCol(tournamentId));
-  const batch = writeBatch(db);
-  batch.set(ref, {
-    label: input.label,
-    winnerName: input.winnerName,
-    winnerPhotoUrl: input.winnerPhotoUrl,
+  await setDoc(ref, {
+    label: input.label.trim(),
     order: input.order,
-    revealed: false,
-    awardedAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
     createdBy,
   } as unknown as LotteryPrize);
-  await batch.commit();
   return ref.id;
 }
 
 export async function updateLotteryPrize(
   tournamentId: string,
   prizeId: string,
-  patch: Partial<CreatePrizeInput>,
+  patch: { label?: string; order?: number },
 ): Promise<void> {
-  await updateDoc(lotteryDoc(tournamentId, prizeId), {
-    ...patch,
-  });
-}
-
-export async function revealLotteryPrize(
-  tournamentId: string,
-  prizeId: string,
-): Promise<void> {
-  await updateDoc(lotteryDoc(tournamentId, prizeId), {
-    revealed: true,
-    revealedAt: serverTimestamp(),
-  });
-}
-
-export async function hideLotteryPrize(
-  tournamentId: string,
-  prizeId: string,
-): Promise<void> {
-  await updateDoc(lotteryDoc(tournamentId, prizeId), {
-    revealed: false,
-  });
+  await updateDoc(lotteryDoc(tournamentId, prizeId), patch);
 }
 
 export async function deleteLotteryPrize(
@@ -76,4 +74,51 @@ export async function deleteLotteryPrize(
   prizeId: string,
 ): Promise<void> {
   await deleteDoc(lotteryDoc(tournamentId, prizeId));
+}
+
+// ---------------------------------------------------------------------------
+// Draw / undraw. The draw reads all participants and all prizes, filters out
+// anyone already assigned as a winner, picks a uniform random survivor, and
+// writes the winner onto the prize. Not inside a Firestore transaction because
+// we need to list two whole collections — a double-assignment race is possible
+// only if two admins click simultaneously, and `undrawLotteryWinner` is always
+// available as an escape hatch.
+
+export async function drawLotteryWinner(
+  tournamentId: string,
+  prizeId: string,
+): Promise<{ participantId: string; name: string } | null> {
+  const [participantsSnap, prizesSnap] = await Promise.all([
+    getDocs(lotteryParticipantsCol(tournamentId)),
+    getDocs(lotteryCol(tournamentId)),
+  ]);
+
+  const taken = new Set<string>();
+  for (const d of prizesSnap.docs) {
+    const wid = d.data().winnerParticipantId;
+    if (wid) taken.add(wid);
+  }
+
+  const remaining = participantsSnap.docs.filter((d) => !taken.has(d.id));
+  if (remaining.length === 0) return null;
+
+  const pick = remaining[Math.floor(Math.random() * remaining.length)];
+  const picked = pick.data();
+  await updateDoc(lotteryDoc(tournamentId, prizeId), {
+    winnerParticipantId: pick.id,
+    winnerName: picked.name,
+    drawnAt: serverTimestamp(),
+  });
+  return { participantId: pick.id, name: picked.name };
+}
+
+export async function undrawLotteryWinner(
+  tournamentId: string,
+  prizeId: string,
+): Promise<void> {
+  await updateDoc(lotteryDoc(tournamentId, prizeId), {
+    winnerParticipantId: deleteField(),
+    winnerName: deleteField(),
+    drawnAt: deleteField(),
+  });
 }

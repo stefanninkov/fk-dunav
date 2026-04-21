@@ -7,19 +7,19 @@ import { useUIStore } from '@/stores/useUIStore';
 
 interface Props {
   prizes: LotteryPrize[];
-  /** Hide every prize that hasn't been revealed yet. Default true — the
-   *  admin editor passes `false` to show everything for management. */
-  onlyRevealed?: boolean;
   /** Bigger rows for the `/lutrija` big-screen view. */
   variant?: 'default' | 'big';
+  /** Only show prizes that already have a winner drawn. */
+  onlyDrawn?: boolean;
 }
 
-export function LotteryBoard({
-  prizes,
-  onlyRevealed = true,
-  variant = 'default',
-}: Props) {
-  const visible = onlyRevealed ? prizes.filter((p) => p.revealed) : prizes;
+/**
+ * Prize list. With `onlyDrawn=false` (default) every prize renders — drawn
+ * prizes show the winner, pending ones show "Čeka se izvlačenje" so the
+ * public can see the full prize line-up ahead of time.
+ */
+export function LotteryBoard({ prizes, variant = 'default', onlyDrawn = false }: Props) {
+  const visible = onlyDrawn ? prizes.filter((p) => !!p.winnerName) : prizes;
 
   if (visible.length === 0) {
     return (
@@ -51,10 +51,9 @@ function PrizeRow({
   const firstRun = useRef(true);
   const reducedMotion = useUIStore((s) => s.reducedMotion);
 
-  // Celebration animation when a prize flips from hidden to revealed.
-  // We can't observe the boolean flip directly from a memo list, so we
-  // animate once on mount when `revealed` is true — that covers newly
-  // arriving rows in the Firestore onSnapshot stream.
+  // Subtle mount pop — mainly so newly drawn prizes arriving over onSnapshot
+  // don't just blink in. The big-screen /lutrija view layers a name-shuffle
+  // animation on top via its own dedicated page.
   useEffect(() => {
     if (!firstRun.current) return;
     firstRun.current = false;
@@ -63,30 +62,15 @@ function PrizeRow({
 
     gsap.fromTo(
       el,
-      { y: '1.5rem', opacity: 0, scale: 0.96 },
+      { y: '1rem', opacity: 0 },
       {
         y: 0,
         opacity: 1,
-        scale: 1,
-        duration: 0.6,
-        ease: 'back.out(1.6)',
-        onComplete: () => gsap.set(el, { clearProps: 'y,opacity,scale,willChange' }),
+        duration: 0.4,
+        ease: 'power2.out',
+        onComplete: () => gsap.set(el, { clearProps: 'y,opacity,willChange' }),
       },
     );
-    // Briefly flash a glow on the ordinal badge.
-    const badge = el.querySelector<HTMLElement>('[data-badge]');
-    if (badge) {
-      gsap.fromTo(
-        badge,
-        { boxShadow: '0 0 0 rgba(1,69,142,0)' },
-        {
-          boxShadow: '0 0 40px rgba(244,197,66,0.65)',
-          duration: 0.8,
-          yoyo: true,
-          repeat: 1,
-        },
-      );
-    }
   }, [reducedMotion]);
 
   const big = variant === 'big';
@@ -94,12 +78,14 @@ function PrizeRow({
   const padding = big ? 'px-6 py-5' : 'px-4 py-3';
   const labelSize = big ? 'text-2xl' : 'text-base';
   const winnerSize = big ? 'text-xl' : 'text-sm';
-  const photoSize = big ? 'h-14 w-14' : 'h-10 w-10';
+  const drawn = !!prize.winnerName;
 
   return (
     <li
       ref={ref}
-      className={`flex items-center gap-4 rounded-lg bg-surface-1 shadow-card ${padding}`}
+      className={`flex items-center gap-4 rounded-lg shadow-card ${padding} ${
+        drawn ? 'bg-surface-1' : 'bg-surface-1/60'
+      }`}
     >
       <span
         data-badge
@@ -120,15 +106,12 @@ function PrizeRow({
       </span>
       <div className="flex flex-1 flex-col">
         <span className={`font-500 text-ink-primary ${labelSize}`}>{prize.label}</span>
-        <span className={`text-ink-secondary ${winnerSize}`}>{prize.winnerName}</span>
+        <span
+          className={`${winnerSize} ${drawn ? 'text-ink-secondary' : 'italic text-ink-tertiary'}`}
+        >
+          {drawn ? prize.winnerName : sr.side.lottery.pending}
+        </span>
       </div>
-      {prize.winnerPhotoUrl ? (
-        <img
-          src={prize.winnerPhotoUrl}
-          alt={prize.winnerName}
-          className={`${photoSize} rounded-full object-cover`}
-        />
-      ) : null}
     </li>
   );
 }
