@@ -20,9 +20,12 @@
  */
 
 import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions/v1';
 import { beforeUserSignedIn } from 'firebase-functions/v2/identity';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { v1 as firestoreV1 } from '@google-cloud/firestore';
+import * as crypto from 'crypto';
 
 admin.initializeApp();
 
@@ -574,4 +577,166 @@ export const propagateBracketWinner = functions
       writeInto(map.winner, winnerSnapshot),
       writeInto(map.loser, loserSnapshot),
     ]);
+  });
+
+// ---------------------------------------------------------------------------
+// scheduledFirestoreBackup — weekly managed export to GCS
+// ---------------------------------------------------------------------------
+//
+// Prerequisites (one-off, see /docs/ARCHITECTURE.md):
+//   1. gsutil mb -p fk-dunav -l europe-west3 gs://fk-dunav-firestore-backups
+//   2. Grant the Cloud Functions runtime service account roles:
+//        roles/datastore.importExportAdmin   (on the project)
+//        roles/storage.admin                 (on the bucket)
+//
+// We export everything (no collectionIds filter) once a week at 03:00 UTC on
+// Sunday so week-over-week restoration is cheap. Output path is timestamped
+// so each run lands in its own directory and retention can be managed via a
+// GCS lifecycle rule on the bucket.
+
+const BACKUP_BUCKET = 'fk-dunav-firestore-backups';
+const firestoreAdminClient = new firestoreV1.FirestoreAdminClient();
+
+// ---------------------------------------------------------------------------
+// createPhotoRecord — anonymous-submission callable with IP rate limit
+// ---------------------------------------------------------------------------
+//
+// Anonymous visitors can upload photos. To prevent abuse we cap submissions
+// at PHOTO_RATE_LIMIT per IP per PHOTO_RATE_WINDOW_MS. Enforcement lives here
+// (not in Firestore rules) because rules can't inspect the caller's IP.
+// Corresponding rule change: /tournaments/{tid}/photos disallows anonymous
+// creates so the only path from the public site is through this callable.
+//
+// App Check should be added in production — without it an attacker can still
+// rotate IPs. For the 2026 tournament this is an acceptable interim control.
+
+const PHOTO_RATE_LIMIT = 5;
+const PHOTO_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+interface CreatePhotoInput {
+  tournamentId: string;
+  type: 'image' | 'video';
+  storagePath: string;
+  fullUrl: string;
+  mimeType: string;
+  sizeBytes: number;
+  matchId?: string;
+  teamIds?: string[];
+  uploaderName?: string;
+  uploaderUserAgent?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+}
+
+function assertShape(input: unknown): asserts input is CreatePhotoInput {
+  if (!input || typeof input !== 'object') {
+    throw new HttpsError('invalid-argument', 'Body must be an object.');
+  }
+  const v = input as Record<string, unknown>;
+  if (typeof v.tournamentId !== 'string' || !v.tournamentId) {
+    throw new HttpsError('invalid-argument', 'tournamentId required');
+  }
+  if (v.type !== 'image' && v.type !== 'video') {
+    throw new HttpsError('invalid-argument', 'type must be image|video');
+  }
+  if (typeof v.storagePath !== 'string' || !v.storagePath.startsWith('uploads/pending/')) {
+    throw new HttpsError('invalid-argument', 'storagePath must start with uploads/pending/');
+  }
+  if (typeof v.fullUrl !== 'string' || !v.fullUrl) {
+    throw new HttpsError('invalid-argument', 'fullUrl required');
+  }
+  if (typeof v.mimeType !== 'string' || !v.mimeType) {
+    throw new HttpsError('invalid-argument', 'mimeType required');
+  }
+  if (typeof v.sizeBytes !== 'number' || v.sizeBytes <= 0) {
+    throw new HttpsError('invalid-argument', 'sizeBytes must be positive');
+  }
+}
+
+function hashIp(ip: string): string {
+  return crypto.createHash('sha256').update(`fk-dunav:${ip}`).digest('hex');
+}
+
+export const createPhotoRecord = onCall(
+  { region: 'europe-west3', cors: true },
+  async (request) => {
+    assertShape(request.data);
+    const input = request.data;
+
+    const rawIp =
+      (request.rawRequest.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ||
+      request.rawRequest.socket?.remoteAddress ||
+      'unknown';
+    const ipKey = hashIp(rawIp);
+
+    // Rate-limit window: keep only timestamps inside the last hour, reject if
+    // the caller already landed PHOTO_RATE_LIMIT submissions in that window.
+    const now = Timestamp.now();
+    const windowStartMs = now.toMillis() - PHOTO_RATE_WINDOW_MS;
+    const rateRef = db.collection('photoRateLimits').doc(ipKey);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(rateRef);
+      const raw = (snap.data()?.recent as Timestamp[] | undefined) ?? [];
+      const recent = raw.filter((t) => t.toMillis() >= windowStartMs);
+      if (recent.length >= PHOTO_RATE_LIMIT) {
+        throw new HttpsError(
+          'resource-exhausted',
+          `Rate limit: max ${PHOTO_RATE_LIMIT} photos per ${PHOTO_RATE_WINDOW_MS / 60000} minutes.`,
+        );
+      }
+      recent.push(now);
+      tx.set(rateRef, { recent, updatedAt: FieldValue.serverTimestamp() });
+    });
+
+    const photoRef = db
+      .collection('tournaments')
+      .doc(input.tournamentId)
+      .collection('photos')
+      .doc();
+
+    await photoRef.set({
+      type: input.type,
+      status: 'pending',
+      storagePath: input.storagePath,
+      fullUrl: input.fullUrl,
+      videoUrl: input.type === 'video' ? input.fullUrl : undefined,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      matchId: input.matchId,
+      teamIds: input.teamIds ?? [],
+      width: input.width,
+      height: input.height,
+      durationSeconds: input.durationSeconds,
+      uploaderName: input.uploaderName,
+      uploaderUserAgent: input.uploaderUserAgent,
+      uploadedAt: FieldValue.serverTimestamp(),
+      takedownRequested: false,
+    });
+
+    return { photoId: photoRef.id };
+  },
+);
+
+export const scheduledFirestoreBackup = functions
+  .region('europe-west3')
+  .pubsub.schedule('0 3 * * 0') // Sunday 03:00 UTC
+  .timeZone('Etc/UTC')
+  .onRun(async () => {
+    const projectId =
+      process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? 'fk-dunav';
+    const databaseName = firestoreAdminClient.databasePath(projectId, '(default)');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const [operation] = await firestoreAdminClient.exportDocuments({
+      name: databaseName,
+      outputUriPrefix: `gs://${BACKUP_BUCKET}/backups/${stamp}`,
+      collectionIds: [], // empty = all collections
+    });
+    functions.logger.info('Firestore export started', {
+      operation: operation.name,
+      outputUri: `gs://${BACKUP_BUCKET}/backups/${stamp}`,
+    });
   });

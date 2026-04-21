@@ -175,6 +175,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // /photoRateLimits — per-IP-hash submission bucket written only by the
+    // createPhotoRecord Cloud Function via Admin SDK. No client access.
+    match /photoRateLimits/{ipHash} {
+      allow read, write: if false;
+    }
+
     // Anonymous push subscriptions — id is the FCM registration token.
     // Any visitor can create/update their own subscription (no auth
     // required, rate-limited by App Check in practice). Reads are only
