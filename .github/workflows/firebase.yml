@@ -8,9 +8,6 @@ on:
     paths:
       - 'firestore.rules'
       - 'firestore.indexes.json'
-      - 'storage.rules'
-      - 'firebase.json'
-      - 'functions/**'
       - '.github/workflows/firebase.yml'
   workflow_dispatch:
 
@@ -22,23 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install functions deps
-        # functions/ doesn't ship a lockfile (the dep surface is small
-        # and pinned via caret ranges); use install rather than ci.
-        run: npm --prefix functions install
-      - name: Build functions
-        run: npm --prefix functions run build
-      - name: Deploy rules, indexes, functions
-        # Storage is omitted on purpose — the CI service account's IAM
-        # grant for firebasestorage.defaultBucket.get has been flaky to
-        # settle, and storage.rules basically never changes. Deploy it
-        # once locally with `firebase deploy --only storage` and forget.
+      - name: Deploy rules + indexes
+        # Only Firestore rules and indexes are auto-deployed. Storage rules
+        # and functions are out on purpose: storage.rules barely changes,
+        # and the Artifact Registry cleanup policy that `firebase deploy`
+        # tries to set up for functions requires IAM the CI service account
+        # doesn't have (and it fails the whole step even though the actual
+        # deploy succeeded). Both are one-off local tasks:
+        #   firebase deploy --only storage
+        #   firebase deploy --only functions --force
         uses: w9jds/firebase-action@v14.2.0
         with:
-          args: deploy --only firestore:rules,firestore:indexes,functions --project fk-dunav --force
+          args: deploy --only firestore:rules,firestore:indexes --project fk-dunav --force
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
