@@ -1,24 +1,15 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot, orderBy, query } from 'firebase/firestore';
 
-import {
-  awardsCol,
-  crossbarCol,
-  fanPollsCol,
-  kupSankaCol,
-  lotteryCol,
-} from '@/lib/firestore/refs';
+import { awardsCol, crossbarCol, fanPollsCol } from '@/lib/firestore/refs';
 import type {
   Award,
   AwardId,
   CrossbarParticipant,
   FanPoll,
-  KupSankaEntry,
-  LotteryPrize,
 } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
-import { LotteryBoard } from '@/features/lottery/components/LotteryBoard';
 import { FanPollCard } from '@/features/voting/components/FanPollCard';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
 
@@ -32,32 +23,24 @@ const awardOrder: AwardId[] = [
   'teamOfTournament',
 ];
 
+/**
+ * /statistika — tournament awards summary + crossbar + open fan polls.
+ * Kup Šanka and Lutrija live in their own top-level tabs so they have
+ * room to breathe (drum animation, leaderboard interactions).
+ */
 export function StatisticsPage() {
   const active = useTournamentStore((s) => s.active);
-  const [lottery, setLottery] = useState<LotteryPrize[]>([]);
   const [awards, setAwards] = useState<Record<string, Award>>({});
-  const [kupSanka, setKupSanka] = useState<KupSankaEntry[]>([]);
   const [crossbar, setCrossbar] = useState<CrossbarParticipant[]>([]);
   const [polls, setPolls] = useState<FanPoll[]>([]);
 
   useEffect(() => {
     if (!active) return;
-    const unsubL = onSnapshot(
-      query(lotteryCol(active.id), orderBy('order', 'asc')),
-      (snap) => setLottery(snap.docs.map((d) => d.data())),
-    );
     const unsubA = onSnapshot(awardsCol(active.id), (snap) => {
       const map: Record<string, Award> = {};
       for (const d of snap.docs) map[d.id] = d.data();
       setAwards(map);
     });
-    const unsubK = onSnapshot(kupSankaCol(active.id), (snap) =>
-      setKupSanka(
-        snap.docs
-          .map((d) => d.data())
-          .sort((a, b) => b.bokala - a.bokala),
-      ),
-    );
     const unsubC = onSnapshot(
       query(crossbarCol(active.id), orderBy('finalRank', 'asc')),
       (snap) => setCrossbar(snap.docs.map((d) => d.data())),
@@ -66,9 +49,7 @@ export function StatisticsPage() {
       setPolls(snap.docs.map((d) => d.data())),
     );
     return () => {
-      unsubL();
       unsubA();
-      unsubK();
       unsubC();
       unsubPolls();
     };
@@ -116,31 +97,6 @@ export function StatisticsPage() {
         </section>
 
         <section>
-          <h2 className="mb-3 font-display text-xl font-600">{sr.admin.kupSanka.title}</h2>
-          {kupSanka.length === 0 ? (
-            <p className="rounded-md bg-surface-1 px-4 py-6 text-sm text-ink-tertiary">
-              Još nema unosa.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {kupSanka.map((e, idx) => (
-                <li
-                  key={e.teamId}
-                  className="flex items-center gap-3 rounded-lg bg-surface-1 px-4 py-3 shadow-card"
-                >
-                  <span className="tnum w-6 font-display text-lg font-700 text-brand-400">
-                    {idx + 1}.
-                  </span>
-                  <span className="flex-1 text-ink-primary">{e.teamName}</span>
-                  <span className="tnum font-display text-lg font-700">{e.bokala}</span>
-                  <span className="text-xs text-ink-tertiary">bokala</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section>
           <h2 className="mb-3 font-display text-xl font-600">{sr.side.crossbar.title}</h2>
           {crossbar.length === 0 ? (
             <p className="rounded-md bg-surface-1 px-4 py-6 text-sm text-ink-tertiary">
@@ -173,12 +129,6 @@ export function StatisticsPage() {
               ))}
             </ul>
           )}
-        </section>
-
-        <section>
-          <h2 className="mb-1 font-display text-xl font-600">{sr.side.lottery.title}</h2>
-          <p className="mb-3 text-sm text-ink-tertiary">{sr.side.lottery.subtitle}</p>
-          <LotteryBoard prizes={lottery} />
         </section>
 
         {polls.length > 0 ? (

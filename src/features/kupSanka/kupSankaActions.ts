@@ -1,29 +1,67 @@
-import { serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 
-import { kupSankaDoc } from '@/lib/firestore/refs';
-import type { Team } from '@/lib/firestore/types';
+import { kupSankaCol, kupSankaDoc } from '@/lib/firestore/refs';
+import type { KupSankaEntry } from '@/lib/firestore/types';
 
 /**
- * Upsert a Kup Šanka entry for a team. Uses teamId as the doc id so a team
- * always has exactly one row; increments happen via setDoc + merge. Denorm
- * teamName + logoUrl for cheap public reads.
+ * Kup Šanka entries are free-form — they represent any participant the admin
+ * wants to track (a tournament team, a visiting team, a friend, etc.), not
+ * just the teams registered for the tournament.
  */
+
+export async function createKupSankaEntry(
+  tournamentId: string,
+  input: { name: string; note?: string },
+  updatedBy: string,
+): Promise<string> {
+  const ref = doc(kupSankaCol(tournamentId));
+  await setDoc(ref, {
+    name: input.name.trim(),
+    note: input.note?.trim() || undefined,
+    bokala: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  } as unknown as KupSankaEntry);
+  return ref.id;
+}
+
 export async function setBokala(
   tournamentId: string,
-  team: Team,
+  entryId: string,
   bokala: number,
   updatedBy: string,
 ): Promise<void> {
-  await setDoc(
-    kupSankaDoc(tournamentId, team.id),
-    {
-      teamId: team.id,
-      teamName: team.name,
-      teamLogoUrl: team.logoUrl,
-      bokala,
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    },
-    { merge: true },
-  );
+  await updateDoc(kupSankaDoc(tournamentId, entryId), {
+    bokala: Math.max(0, bokala),
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  });
+}
+
+export async function updateKupSankaEntry(
+  tournamentId: string,
+  entryId: string,
+  patch: { name?: string; note?: string },
+  updatedBy: string,
+): Promise<void> {
+  await updateDoc(kupSankaDoc(tournamentId, entryId), {
+    ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+    ...(patch.note !== undefined ? { note: patch.note.trim() || undefined } : {}),
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  });
+}
+
+export async function deleteKupSankaEntry(
+  tournamentId: string,
+  entryId: string,
+): Promise<void> {
+  await deleteDoc(kupSankaDoc(tournamentId, entryId));
 }

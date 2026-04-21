@@ -21,6 +21,7 @@ import type {
   KupSankaEntry,
   LotteryParticipant,
   LotteryPrize,
+  LotterySession,
   Match,
   MatchEvent,
   Player,
@@ -60,6 +61,7 @@ export const matchConverter       = makeConverter<Match>();
 export const matchEventConverter  = makeConverter<MatchEvent>();
 export const lotteryPrizeConverter = makeConverter<LotteryPrize>();
 export const lotteryParticipantConverter = makeConverter<LotteryParticipant>();
+export const lotterySessionConverter = makeConverter<LotterySession>();
 export const announcementConverter = makeConverter<Announcement>();
 export const sponsorConverter      = makeConverter<Sponsor>();
 export const photoConverter        = makeConverter<Photo>();

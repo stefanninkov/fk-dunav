@@ -9,6 +9,7 @@ import { AppRoot } from './AppRoot';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 
 import { HomePage } from '@/pages/public/HomePage';
+import { KupSankaPage as PublicKupSankaPage } from '@/pages/public/KupSankaPage';
 import { GroupsPage } from '@/pages/public/GroupsPage';
 import { SchedulePage } from '@/pages/public/SchedulePage';
 import { ResultsPage } from '@/pages/public/ResultsPage';
@@ -102,6 +103,9 @@ const AdminVotingPage = lazy(() =>
 const AdminChampionsPage = lazy(() =>
   import('@/pages/admin/ChampionsPage').then((m) => ({ default: m.ChampionsPage })),
 );
+const AdminLotteryPage = lazy(() =>
+  import('@/pages/admin/LotteryPage').then((m) => ({ default: m.LotteryPage })),
+);
 
 function AdminFallback() {
   return <PagePlaceholder title={sr.admin.nav.dashboard} description={sr.common.loading} />;
@@ -140,6 +144,7 @@ export const router = createBrowserRouter(
             { path: '/utakmica/:matchId', element: <MatchDetailPage /> },
             { path: '/nagrade', element: <PublicAwardsPage /> },
             { path: '/lutrija', element: <LotteryLivePage /> },
+            { path: '/kup-sanka', element: <PublicKupSankaPage /> },
             { path: '/sponzori', element: <SponsorsPage /> },
             { path: '/pravilnik', element: <RulesPage /> },
             { path: '/o-turniru', element: <AboutPage /> },
@@ -177,6 +182,7 @@ export const router = createBrowserRouter(
             { path: 'korisnici', element: lazyRoute(<AdminUsersPage />) },
             { path: 'glasanje', element: lazyRoute(<AdminVotingPage />) },
             { path: 'sampioni', element: lazyRoute(<AdminChampionsPage />) },
+            { path: 'lutrija', element: lazyRoute(<AdminLotteryPage />) },
             { path: '*', element: <Navigate to="/admin" replace /> },
           ],
         },

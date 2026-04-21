@@ -1,26 +1,12 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
 
-import {
-  awardsCol,
-  lotteryCol,
-  lotteryParticipantsCol,
-  playersCol,
-  teamsCol,
-} from '@/lib/firestore/refs';
-import type {
-  Award,
-  AwardId,
-  LotteryParticipant,
-  LotteryPrize,
-  Player,
-  Team,
-} from '@/lib/firestore/types';
+import { awardsCol, playersCol, teamsCol } from '@/lib/firestore/refs';
+import type { Award, AwardId, Player, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { setAward } from '@/features/awards/awardActions';
-import { LotteryBoardEditor } from '@/features/lottery/components/LotteryBoardEditor';
 
 type TeamAwardId = Extract<AwardId, 'champion' | 'runnerUp' | 'thirdPlace'>;
 type PlayerAwardId = Extract<AwardId, 'mvp' | 'topScorer' | 'crossbarWinner'>;
@@ -28,14 +14,16 @@ type PlayerAwardId = Extract<AwardId, 'mvp' | 'topScorer' | 'crossbarWinner'>;
 const teamAwards: TeamAwardId[] = ['champion', 'runnerUp', 'thirdPlace'];
 const playerAwards: PlayerAwardId[] = ['mvp', 'topScorer', 'crossbarWinner'];
 
+/**
+ * Admin awards editor. Tournament awards only — Lutrija lives in its own
+ * tab at /admin/lutrija.
+ */
 export function AwardsPage() {
   const active = useTournamentStore((s) => s.active);
   const uid = useAuthStore((s) => s.uid);
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [awards, setAwards] = useState<Record<string, Award>>({});
-  const [prizes, setPrizes] = useState<LotteryPrize[]>([]);
-  const [participants, setParticipants] = useState<LotteryParticipant[]>([]);
 
   useEffect(() => {
     if (!active) return;
@@ -52,19 +40,10 @@ export function AwardsPage() {
       for (const d of snap.docs) map[d.id] = d.data();
       setAwards(map);
     });
-    const unsubL = onSnapshot(
-      query(lotteryCol(active.id), orderBy('order', 'asc')),
-      (snap) => setPrizes(snap.docs.map((d) => d.data())),
-    );
-    const unsubPart = onSnapshot(lotteryParticipantsCol(active.id), (snap) =>
-      setParticipants(snap.docs.map((d) => d.data())),
-    );
     return () => {
       unsubT();
       unsubP();
       unsubA();
-      unsubL();
-      unsubPart();
     };
   }, [active]);
 
@@ -109,7 +88,7 @@ export function AwardsPage() {
       <header>
         <h1 className="font-display text-2xl font-700">{sr.admin.awards.title}</h1>
         <p className="mt-1 text-sm text-ink-secondary">
-          Zvanične nagrade turnira i Lutrija su objedinjene ovde.
+          Zvanične nagrade turnira. Lutrija se podešava u odvojenom tabu.
         </p>
       </header>
 
@@ -133,13 +112,6 @@ export function AwardsPage() {
           />
         ))}
       </section>
-
-      <LotteryBoardEditor
-        tournamentId={active.id}
-        participants={participants}
-        prizes={prizes}
-        createdBy={uid}
-      />
     </section>
   );
 }
@@ -196,7 +168,7 @@ function PlayerAwardRow({
         className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary"
       >
         <option value="" disabled>
-          Izaberi igra\u010Da…
+          Izaberi igrača…
         </option>
         {players.map((p) => (
           <option key={p.id} value={p.id}>

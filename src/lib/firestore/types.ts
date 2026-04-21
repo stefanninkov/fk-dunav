@@ -288,12 +288,16 @@ export interface Sponsor {
 
 // ---------------------------------------------------------------------------
 // Kup Šanka (beer mug leaderboard)
+//
+// Participants are free-form — not necessarily tournament teams. Admin types
+// a name, tracks bokala with +/- buttons, optional note for disambiguation.
 
 export interface KupSankaEntry {
-  teamId: string;
-  teamName: string;
-  teamLogoUrl?: string;
+  id: string;
+  name: string;
+  note?: string;
   bokala: number;
+  createdAt: Timestamp;
   updatedAt: Timestamp;
   updatedBy: string;
 }
@@ -369,6 +373,19 @@ export interface LotteryPrize {
   drawnAt?: Timestamp;
   createdAt: Timestamp;
   createdBy: string;
+}
+
+/**
+ * Single-doc session state for the lottery. Admin toggles `drumVisible`
+ * to signal "izvlačenje počinje" — the public /lutrija view then renders
+ * the big rotating bubanj with participant chips inside. Doc id is fixed
+ * at "current".
+ */
+export interface LotterySession {
+  id: string;
+  drumVisible: boolean;
+  updatedAt: Timestamp;
+  updatedBy: string;
 }
 
 // ---------------------------------------------------------------------------

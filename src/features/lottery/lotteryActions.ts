@@ -13,8 +13,13 @@ import {
   lotteryDoc,
   lotteryParticipantDoc,
   lotteryParticipantsCol,
+  lotterySessionDoc,
 } from '@/lib/firestore/refs';
-import type { LotteryParticipant, LotteryPrize } from '@/lib/firestore/types';
+import type {
+  LotteryParticipant,
+  LotteryPrize,
+  LotterySession,
+} from '@/lib/firestore/types';
 
 // ---------------------------------------------------------------------------
 // Participants — the raffle pool. Admin enters names upfront; the live draw
@@ -121,4 +126,24 @@ export async function undrawLotteryWinner(
     winnerName: deleteField(),
     drawnAt: deleteField(),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Session — single "current" doc admin flips to signal that the draw is
+// about to start. Public /lutrija watches this and reveals the bubanj.
+
+export async function setLotteryDrumVisible(
+  tournamentId: string,
+  visible: boolean,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(
+    lotterySessionDoc(tournamentId),
+    {
+      drumVisible: visible,
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    } as unknown as LotterySession,
+    { merge: true },
+  );
 }

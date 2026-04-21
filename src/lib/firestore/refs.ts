@@ -20,6 +20,7 @@ import {
   kupSankaConverter,
   lotteryParticipantConverter,
   lotteryPrizeConverter,
+  lotterySessionConverter,
   matchConverter,
   matchEventConverter,
   photoConverter,
@@ -45,6 +46,7 @@ import type {
   KupSankaEntry,
   LotteryParticipant,
   LotteryPrize,
+  LotterySession,
   Match,
   MatchEvent,
   Photo,
@@ -172,6 +174,13 @@ export const lotteryParticipantDoc = (
 ): DocumentReference<LotteryParticipant> =>
   doc(db, 'tournaments', tournamentId, 'lotteryParticipants', participantId).withConverter(
     lotteryParticipantConverter,
+  );
+
+export const lotterySessionDoc = (
+  tournamentId: string,
+): DocumentReference<LotterySession> =>
+  doc(db, 'tournaments', tournamentId, 'lotterySession', 'current').withConverter(
+    lotterySessionConverter,
   );
 
 export const announcementsCol = (

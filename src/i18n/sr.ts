@@ -37,6 +37,8 @@ export const sr = {
     knockout: 'Nokaut',
     statistics: 'Statistika',
     awards: 'Nagrade',
+    lottery: 'Lutrija',
+    kupSanka: 'Kup Šanka',
     gallery: 'Galerija',
     teams: 'Timovi',
     sponsors: 'Sponzori',
@@ -178,8 +180,13 @@ export const sr = {
     },
 
     kupSanka: {
-      title: 'Kup \u0160anka',
-      empty: 'Prvo dodaj timove.',
+      title: 'Kup Šanka',
+      empty: 'Još nema učesnika.',
+      newButton: 'Dodaj učesnika',
+      namePlaceholder: 'Ime učesnika / tima',
+      notePlaceholder: 'Napomena (opciono)',
+      bokala: 'bokala',
+      confirmDelete: 'Obrisati učesnika?',
     },
 
     crossbar: {
@@ -211,6 +218,15 @@ export const sr = {
         topScorerName: 'Najbolji strelac',
         notes: 'Napomena (opciono)',
       },
+    },
+
+    lottery: {
+      drumOn: 'Bubanj je uključen',
+      drumOff: 'Bubanj je isključen',
+      drumHelp:
+        'Kada uključiš bubanj, na javnoj strani /lutrija pojaviće se veliki rotirajući bubanj sa učesnicima — spreman za izvlačenje.',
+      showDrum: 'Pokaži bubanj',
+      hideDrum: 'Sakrij bubanj',
     },
 
     awards: {
