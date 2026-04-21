@@ -4,6 +4,7 @@ import {
   doc,
   getDocs,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore';
 
@@ -14,7 +15,6 @@ import {
   lotteryParticipantsCol,
 } from '@/lib/firestore/refs';
 import type { LotteryParticipant, LotteryPrize } from '@/lib/firestore/types';
-import { setDoc } from 'firebase/firestore';
 
 // ---------------------------------------------------------------------------
 // Participants — the raffle pool. Admin enters names upfront; the live draw

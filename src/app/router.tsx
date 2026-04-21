@@ -111,9 +111,6 @@ export const router = createBrowserRouter([
           { path: 'galerija', element: <AdminGalleryPage /> },
           { path: 'korisnici', element: <AdminUsersPage /> },
           { path: 'glasanje', element: <AdminVotingPage /> },
-          // TODO(later phases): utakmice editor, galerija, obavestenja,
-          // sponzori, kup-sanka, precka, nagrade, korisnici, glasanje,
-          // sampioni.
           { path: '*', element: <Navigate to="/admin" replace /> },
         ],
       },
