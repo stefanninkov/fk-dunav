@@ -1,28 +1,19 @@
 /**
  * Cloud Functions for the FK Dunav tournament app.
  *
- * Functions shipped here (Phase 5):
- *  - promoteAdminOnLogin (beforeCreate / beforeSignIn blocking trigger):
- *      looks up the signing-in email in /adminEmails and sets the
- *      `role: "admin"` custom claim so clients see it on the ID token.
- *      Supersedes the client-side /admins doc write once live.
- *  - recomputeMatchScore (Firestore onWrite on event docs):
- *      aggregates finalized score from the event log so the stored
- *      match.score matches even if the client write got out of sync.
- *  - onMatchEvent (Firestore onCreate on event docs):
- *      FCM multicast push for goal / matchStart / matchEnd events to
- *      every subscriber of that match.
- *  - onAnnouncementCreate (Firestore onCreate on announcements):
- *      if severity === 'urgent', sends an FCM broadcast to every
- *      subscription that opted in to broadcasts.
- *
  * The Admin SDK is initialized once at module scope.
+ *
+ * NOTE: `promoteAdminOnLogin` (a `beforeUserSignedIn` blocking trigger)
+ * was removed: blocking Auth triggers require Google Cloud Identity
+ * Platform (GCIP), which this project doesn't have. Admin promotion is
+ * handled client-side in src/app/AppRoot.tsx — the client looks up its
+ * own email in /adminEmails and, if present, writes /admins/{uid}; the
+ * rules then treat that doc as proof of admin role.
  */
 
 import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions/v1';
-import { beforeUserSignedIn } from 'firebase-functions/v2/identity';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { v1 as firestoreV1 } from '@google-cloud/firestore';
 import * as crypto from 'crypto';
@@ -32,42 +23,6 @@ admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
 const bucket = admin.storage().bucket();
-
-// ---------------------------------------------------------------------------
-// promoteAdminOnLogin — v2 Identity Platform trigger
-// ---------------------------------------------------------------------------
-
-export const promoteAdminOnLogin = beforeUserSignedIn(
-  { region: 'europe-west3' },
-  async (event) => {
-    const email = event.data?.email?.toLowerCase();
-    if (!email) return {};
-
-    // 1. Hardcoded day-one admin: /adminEmails/{email}.
-    const seed = await db.collection('adminEmails').doc(email).get();
-    if (seed.exists) {
-      return { customClaims: { role: 'admin' } };
-    }
-
-    // 2. Invited users: /invites/{email} with role='admin' | 'reporter'.
-    const inviteRef = db.collection('invites').doc(email);
-    const invite = await inviteRef.get();
-    const data = invite.data();
-    if (
-      invite.exists &&
-      !data?.revoked &&
-      (data?.role === 'admin' || data?.role === 'reporter')
-    ) {
-      await inviteRef.update({
-        consumedAt: FieldValue.serverTimestamp(),
-        consumedByUid: event.data?.uid,
-      });
-      return { customClaims: { role: data.role } };
-    }
-
-    return {};
-  },
-);
 
 // ---------------------------------------------------------------------------
 // recomputeMatchScore — Firestore event trigger
