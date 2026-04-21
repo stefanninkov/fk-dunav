@@ -1,12 +1,12 @@
 import {
   doc,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 
-import { storage } from '@/lib/firebase';
+import { functions, storage } from '@/lib/firebase';
 import { photoDoc, photosCol } from '@/lib/firestore/refs';
 import type { Photo } from '@/lib/firestore/types';
 
@@ -23,6 +23,23 @@ export interface UploadProgress {
   photoId: string;
 }
 
+interface CreatePhotoRecordResult {
+  photoId: string;
+}
+
+/**
+ * Anonymous photo submission flow:
+ *  1. Generate a local photoId so the Storage path is stable.
+ *  2. Upload bytes to `uploads/pending/{photoId}/{name}` (public write,
+ *     Storage rules gate mime + size).
+ *  3. Call the `createPhotoRecord` Cloud Function, which rate-limits by
+ *     IP and writes the /tournaments/{tid}/photos/{photoId} doc as admin.
+ *  4. If the callable rejects (rate limit or validation), delete the
+ *     orphan Storage object so the bucket stays clean.
+ *
+ * Firestore rules disallow anonymous writes on the photos collection —
+ * the only path into it from the public site is through this function.
+ */
 export async function uploadPhoto(
   tournamentId: string,
   input: UploadInput,
@@ -53,23 +70,34 @@ export async function uploadPhoto(
   const fullUrl = await getDownloadURL(storageRef);
   const type = input.file.type.startsWith('video/') ? 'video' : 'image';
 
-  await setDoc(photoDoc(tournamentId, photoId), {
-    type,
-    status: 'pending',
-    storagePath: path,
-    fullUrl,
-    videoUrl: type === 'video' ? fullUrl : undefined,
-    mimeType: input.file.type,
-    sizeBytes: input.file.size,
-    matchId: input.matchId,
-    teamIds: input.teamIds ?? [],
-    uploaderName: input.uploaderName,
-    uploaderUserAgent: navigator.userAgent,
-    uploadedAt: serverTimestamp(),
-    takedownRequested: false,
-  } as unknown as Photo);
-
-  return photoId;
+  const createPhotoRecord = httpsCallable<Record<string, unknown>, CreatePhotoRecordResult>(
+    functions,
+    'createPhotoRecord',
+  );
+  try {
+    const result = await createPhotoRecord({
+      tournamentId,
+      type,
+      storagePath: path,
+      fullUrl,
+      mimeType: input.file.type,
+      sizeBytes: input.file.size,
+      matchId: input.matchId,
+      teamIds: input.teamIds ?? [],
+      uploaderName: input.uploaderName,
+      uploaderUserAgent: navigator.userAgent,
+    });
+    return result.data.photoId;
+  } catch (err) {
+    // The callable rejected — orphan upload lives in Storage, so delete
+    // it best-effort before surfacing the error to the UI.
+    try {
+      await deleteObject(storageRef);
+    } catch {
+      /* already gone */
+    }
+    throw err;
+  }
 }
 
 export async function approvePhoto(
