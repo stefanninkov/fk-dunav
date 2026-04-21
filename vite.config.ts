@@ -53,6 +53,9 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('/gsap/')) {
             return 'gsap';
           }
+          if (id.includes('/@sentry/')) {
+            return 'sentry';
+          }
           if (id.includes('/lucide-react/')) {
             return 'icons';
           }

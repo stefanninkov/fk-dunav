@@ -17,6 +17,7 @@
     "@fontsource/inter": "^5.0.18",
     "@fontsource/space-grotesk": "^5.0.19",
     "@hookform/resolvers": "^3.9.0",
+    "@sentry/react": "^10.49.0",
     "firebase": "^10.13.0",
     "gsap": "^3.12.5",
     "lucide-react": "^0.441.0",
