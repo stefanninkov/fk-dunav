@@ -1,5 +1,10 @@
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+  type AppCheck,
+} from 'firebase/app-check';
+import {
   getAnalytics,
   isSupported as isAnalyticsSupported,
   type Analytics,
@@ -39,6 +44,33 @@ const firebaseConfig: FirebaseOptions = {
 const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
 export const firebaseApp: FirebaseApp = initializeApp(firebaseConfig);
+
+/**
+ * App Check — proves requests come from our real web app, not a script.
+ * Must be initialized BEFORE any other Firebase service call so every
+ * outgoing request carries the token. In dev (emulators on, or no site
+ * key) we skip entirely; in dev against real prod, set
+ *   (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+ * before this runs to get a per-browser debug token, then whitelist it in
+ * the Firebase console → App Check → Debug tokens.
+ *
+ * Enforcement is controlled PER-SERVICE in the Firebase console. We ship
+ * unenforced first, watch metrics, then flip enforcement on once 95%+ of
+ * requests carry valid tokens.
+ */
+const appCheckSiteKey = import.meta.env.VITE_APPCHECK_SITE_KEY;
+export let appCheck: AppCheck | null = null;
+if (appCheckSiteKey && !useEmulators) {
+  try {
+    appCheck = initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaV3Provider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    // Double-init throws in dev with HMR; safe to swallow.
+    console.warn('App Check init skipped:', err);
+  }
+}
 
 // Firestore with offline persistence enabled from the start — mandatory for
 // the reporter workflow. Multi-tab manager keeps tabs in sync.

@@ -47,6 +47,9 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('@firebase/functions') || id.includes('firebase/functions')) {
             return 'firebase-functions';
           }
+          if (id.includes('@firebase/app-check') || id.includes('firebase/app-check')) {
+            return 'firebase-appcheck';
+          }
           if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router')) {
             return 'react-vendor';
           }
