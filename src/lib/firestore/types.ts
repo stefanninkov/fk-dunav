@@ -244,7 +244,7 @@ export interface Photo {
 // ---------------------------------------------------------------------------
 // Content page (admin-editable markdown: /pravilnik, /o-turniru)
 
-export type ContentPageId = 'pravilnik' | 'oTurniru' | 'archive2025';
+export type ContentPageId = 'pravilnik' | 'oTurniru';
 
 export interface ContentPage {
   id: ContentPageId;
@@ -373,9 +373,8 @@ export interface LotteryPrize {
 
 // ---------------------------------------------------------------------------
 // Champions — historical winners per edition. Top-level so the /sampioni
-// page is independent of archived tournament docs (earlier editions like
-// 2025 live only as a static Webflow replica at /2025). Admin enters
-// entries manually from /admin/sampioni; doc id = year as string.
+// page is independent of archived tournament docs. Admin enters entries
+// manually from /admin/sampioni; doc id = year as string.
 
 export interface Champion {
   id: string; // year as string, e.g. '2025'

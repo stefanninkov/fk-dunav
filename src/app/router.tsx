@@ -25,7 +25,6 @@ import { AboutPage } from '@/pages/public/AboutPage';
 import { ChampionsPage } from '@/pages/public/ChampionsPage';
 import { NotFoundPage } from '@/pages/public/NotFoundPage';
 import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
-import { Archive2025Page } from '@/pages/public/Archive2025Page';
 import { PublicAwardsPage } from '@/pages/public/PublicAwardsPage';
 import { LotteryLivePage } from '@/pages/public/LotteryLivePage';
 
@@ -139,7 +138,6 @@ export const router = createBrowserRouter(
             { path: '/tim/:teamId', element: <TeamDetailPage /> },
             { path: '/igrac/:playerId', element: <PlayerDetailPage /> },
             { path: '/utakmica/:matchId', element: <MatchDetailPage /> },
-            { path: '/2025', element: <Archive2025Page /> },
             { path: '/nagrade', element: <PublicAwardsPage /> },
             { path: '/lutrija', element: <LotteryLivePage /> },
             { path: '/sponzori', element: <SponsorsPage /> },

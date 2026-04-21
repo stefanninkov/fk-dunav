@@ -7,9 +7,8 @@ import type { Champion } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 
 /**
- * Public /sampioni. Chronological list of past tournament winners. Data is
- * admin-entered via /admin/sampioni — there's no scraping (the 2025 archive
- * at /2025 is a separate static replica).
+ * Public /sampioni. Chronological list of past tournament winners. Data
+ * is admin-entered via /admin/sampioni.
  */
 export function ChampionsPage() {
   const [champions, setChampions] = useState<Champion[]>([]);
