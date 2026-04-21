@@ -39,6 +39,7 @@ import { ContentAdminPage } from '@/pages/admin/ContentPage';
 import { AdminGalleryPage } from '@/pages/admin/AdminGalleryPage';
 import { UsersPage as AdminUsersPage } from '@/pages/admin/UsersPage';
 import { VotingPage as AdminVotingPage } from '@/pages/admin/VotingPage';
+import { ChampionsPage as AdminChampionsPage } from '@/pages/admin/ChampionsPage';
 import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
 import { Archive2025Page } from '@/pages/public/Archive2025Page';
 import { PublicAwardsPage } from '@/pages/public/PublicAwardsPage';
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
           { path: 'galerija', element: <AdminGalleryPage /> },
           { path: 'korisnici', element: <AdminUsersPage /> },
           { path: 'glasanje', element: <AdminVotingPage /> },
+          { path: 'sampioni', element: <AdminChampionsPage /> },
           { path: '*', element: <Navigate to="/admin" replace /> },
         ],
       },

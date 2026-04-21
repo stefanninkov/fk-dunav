@@ -372,6 +372,29 @@ export interface LotteryPrize {
 }
 
 // ---------------------------------------------------------------------------
+// Champions — historical winners per edition. Top-level so the /sampioni
+// page is independent of archived tournament docs (earlier editions like
+// 2025 live only as a static Webflow replica at /2025). Admin enters
+// entries manually from /admin/sampioni; doc id = year as string.
+
+export interface Champion {
+  id: string; // year as string, e.g. '2025'
+  year: number;
+  edition?: number;
+  tournamentName?: string;
+  championTeamName: string;
+  championLogoUrl?: string;
+  runnerUpTeamName?: string;
+  thirdPlaceTeamName?: string;
+  mvpPlayerName?: string;
+  topScorerName?: string;
+  notes?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+// ---------------------------------------------------------------------------
 // Top-level, not tournament-scoped
 
 export interface AdminEmail {

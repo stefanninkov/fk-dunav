@@ -77,6 +77,21 @@ export const sr = {
     },
     logout: 'Odjava',
 
+    home: {
+      signedInAs: 'Prijavljen',
+      activeCard: 'Aktivan turnir',
+      configure: 'Podesi',
+      liveCard: 'Utakmice uživo',
+      liveNone: 'Nema utakmica u toku.',
+      liveCount: (n: number) => (n === 1 ? '1 utakmica uživo' : `${n} utakmica uživo`),
+      openLive: 'Otvori',
+      photosCard: 'Fotografije na čekanju',
+      photosNone: 'Sve obrađeno.',
+      photosCount: (n: number) =>
+        n === 1 ? '1 fotografija čeka pregled' : `${n} fotografija čeka pregled`,
+      openModeration: 'Pregledaj',
+    },
+
     tournament: {
       title: 'Turniri',
       newButton: 'Kreiraj turnir',
@@ -177,6 +192,24 @@ export const sr = {
         teamName: 'Tim (opciono)',
         qualifyingScore: 'Pogo\u0111enih pre\u010Daka',
         finalRank: 'Pozicija (1 = pobednik)',
+      },
+    },
+
+    champions: {
+      title: 'Šampioni',
+      newButton: 'Dodaj izdanje',
+      empty: 'Još nema unetih izdanja.',
+      form: {
+        year: 'Godina',
+        edition: 'Izdanje (broj)',
+        tournamentName: 'Naziv turnira (opciono)',
+        championTeamName: 'Šampion',
+        championLogoUrl: 'URL grba šampiona (opciono)',
+        runnerUpTeamName: 'Vicešampion',
+        thirdPlaceTeamName: '3. mesto',
+        mvpPlayerName: 'MVP',
+        topScorerName: 'Najbolji strelac',
+        notes: 'Napomena (opciono)',
       },
     },
 

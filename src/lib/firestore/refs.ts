@@ -11,6 +11,7 @@ import {
   announcementConverter,
   appUserConverter,
   awardConverter,
+  championConverter,
   contentPageConverter,
   crossbarConverter,
   fanPollConverter,
@@ -33,6 +34,7 @@ import type {
   Announcement,
   AppUser,
   Award,
+  Champion,
   ContentPage,
   ContentPageId,
   CrossbarParticipant,
@@ -77,6 +79,12 @@ export const usersCol = (): CollectionReference<AppUser> =>
 
 export const userDoc = (uid: string): DocumentReference<AppUser> =>
   doc(db, 'users', uid).withConverter(appUserConverter);
+
+export const championsCol = (): CollectionReference<Champion> =>
+  collection(db, 'champions').withConverter(championConverter);
+
+export const championDoc = (year: string): DocumentReference<Champion> =>
+  doc(db, 'champions', year).withConverter(championConverter);
 
 export const invitesCol = (): CollectionReference<Invite> =>
   collection(db, 'invites').withConverter(inviteConverter);

@@ -166,6 +166,15 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------------------------
+    // /champions — historical tournament winners (top-level). Public
+    // read, admin write. Doc id = year (e.g. '2025').
+    // ------------------------------------------------------------
+    match /champions/{year} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Anonymous push subscriptions — id is the FCM registration token.
     // Any visitor can create/update their own subscription (no auth
     // required, rate-limited by App Check in practice). Reads are only

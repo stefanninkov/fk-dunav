@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { onSnapshot, query, where } from 'firebase/firestore';
 
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
+import { matchesCol, photosCol } from '@/lib/firestore/refs';
 
 export function AdminHomePage() {
   const email = useAuthStore((s) => s.email);
@@ -10,12 +13,35 @@ export function AdminHomePage() {
   const active = useTournamentStore((s) => s.active);
   const loading = useTournamentStore((s) => s.loading);
 
+  const [liveCount, setLiveCount] = useState(0);
+  const [pendingPhotos, setPendingPhotos] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setLiveCount(0);
+      setPendingPhotos(0);
+      return;
+    }
+    const unsubLive = onSnapshot(
+      query(matchesCol(active.id), where('status', '==', 'live')),
+      (snap) => setLiveCount(snap.size),
+    );
+    const unsubPhotos = onSnapshot(
+      query(photosCol(active.id), where('status', '==', 'pending')),
+      (snap) => setPendingPhotos(snap.size),
+    );
+    return () => {
+      unsubLive();
+      unsubPhotos();
+    };
+  }, [active]);
+
   return (
     <section className="flex flex-col gap-6">
       <header>
         <h1 className="font-display text-2xl font-700">{sr.admin.nav.dashboard}</h1>
         <p className="mt-1 text-sm text-ink-secondary">
-          Prijavljen: <span className="text-ink-primary">{email}</span>
+          {sr.admin.home.signedInAs}: <span className="text-ink-primary">{email}</span>
           {role ? (
             <span className="ml-2 rounded-full bg-brand-900 px-2 py-0.5 text-xs">{role}</span>
           ) : null}
@@ -24,29 +50,39 @@ export function AdminHomePage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
-          <Card title="Aktivan turnir" body={sr.common.loading} />
+          <Card title={sr.admin.home.activeCard} body={sr.common.loading} />
         ) : active ? (
           <Card
-            title="Aktivan turnir"
+            title={sr.admin.home.activeCard}
             body={`${active.name} (${active.year})`}
             linkTo="/admin/turnir"
-            linkLabel="Podesi"
+            linkLabel={sr.admin.home.configure}
           />
         ) : (
           <Card
-            title="Aktivan turnir"
+            title={sr.admin.home.activeCard}
             body={sr.admin.tournament.noActive}
             linkTo="/admin/turnir"
             linkLabel={sr.admin.tournament.newButton}
           />
         )}
-        <Card title="Utakmice uživo" body="Nema utakmica u toku." />
-        <Card title="Fotografije na čekanju" body="0 — sve je obrađeno." />
+        <Card
+          title={sr.admin.home.liveCard}
+          body={liveCount === 0 ? sr.admin.home.liveNone : sr.admin.home.liveCount(liveCount)}
+          linkTo={liveCount > 0 ? '/admin/utakmice' : undefined}
+          linkLabel={liveCount > 0 ? sr.admin.home.openLive : undefined}
+        />
+        <Card
+          title={sr.admin.home.photosCard}
+          body={
+            pendingPhotos === 0
+              ? sr.admin.home.photosNone
+              : sr.admin.home.photosCount(pendingPhotos)
+          }
+          linkTo={pendingPhotos > 0 ? '/admin/galerija' : undefined}
+          linkLabel={pendingPhotos > 0 ? sr.admin.home.openModeration : undefined}
+        />
       </div>
-
-      <p className="text-xs text-ink-tertiary">
-        Ostali odeljci (igrači, raspored, galerija, nagrade…) se pune u narednim fazama.
-      </p>
     </section>
   );
 }

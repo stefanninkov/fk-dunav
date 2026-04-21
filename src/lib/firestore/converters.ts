@@ -11,6 +11,7 @@ import type {
   Announcement,
   AppUser,
   Award,
+  Champion,
   ContentPage,
   CrossbarParticipant,
   FanPoll,
@@ -65,6 +66,7 @@ export const photoConverter        = makeConverter<Photo>();
 export const kupSankaConverter     = makeConverter<KupSankaEntry>();
 export const crossbarConverter     = makeConverter<CrossbarParticipant>();
 export const awardConverter        = makeConverter<Award>();
+export const championConverter     = makeConverter<Champion>();
 export const adminEmailConverter   = makeConverter<AdminEmail>();
 export const appUserConverter      = makeConverter<AppUser>();
 export const pushSubscriptionConverter = makeConverter<PushSubscription>();
