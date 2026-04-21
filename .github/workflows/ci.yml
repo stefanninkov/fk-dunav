@@ -36,15 +36,24 @@ jobs:
           node-version: '20'
           cache: 'npm'
       # firebase-tools boots the Firestore emulator (Java-based) inside
-      # `emulators:exec`, so we need a JRE on the runner. Cache it so we
-      # don't reinstall it every run.
+      # `emulators:exec`, so we need a JRE on the runner.
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      # Cache the ~50MB emulator JAR to avoid re-downloading it on every run
+      # (the download is the flakiest step of the whole pipeline).
+      - name: Cache Firebase emulator JAR
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-v1
       - name: Install
         run: npm ci --legacy-peer-deps
       - name: Install firebase-tools
         run: npm install -g firebase-tools
       - name: Run Firestore rules tests
         run: npm run test:rules
+      - name: Show emulator log on failure
+        if: failure()
+        run: cat firestore-debug.log || true

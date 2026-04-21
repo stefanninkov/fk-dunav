@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
-    "test:rules": "firebase emulators:exec --only firestore --project=fk-dunav-rules-test \"vitest run tests/rules\"",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-fk-dunav \"npm exec vitest -- run tests/rules\"",
     "deploy:gh": "npm run build && gh-pages -d dist -b gh-pages"
   },
   "dependencies": {
