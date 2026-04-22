@@ -46,6 +46,7 @@ export const sr = {
     rules: 'Pravilnik',
     about: 'O turniru',
     champions: 'Šampioni',
+    more: 'Više',
     /** Group labels shown on the dropdown parent in the header. */
     group: {
       results: 'Rezultati',

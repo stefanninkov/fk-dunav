@@ -24,7 +24,9 @@ export function HomePage() {
         <h1 className="mt-5 font-display text-4xl font-700 leading-tight text-ink-primary sm:text-5xl lg:text-6xl">
           {sr.brand.tournament}
         </h1>
-        <p className="mt-3 max-w-2xl text-base text-ink-secondary sm:text-lg">{sr.brand.tagline}</p>
+        <p className="mt-4 max-w-3xl font-display text-2xl font-600 text-white sm:text-3xl lg:text-4xl">
+          {sr.brand.tagline}
+        </p>
 
         {isLive ? (
           <NavLink
