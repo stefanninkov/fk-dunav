@@ -39,12 +39,18 @@ export const sr = {
     awards: 'Nagrade',
     lottery: 'Lutrija',
     kupSanka: 'Kup Šanka',
+    crossbar: 'Prečka',
     gallery: 'Galerija',
     teams: 'Timovi',
     sponsors: 'Sponzori',
     rules: 'Pravilnik',
     about: 'O turniru',
     champions: 'Šampioni',
+    /** Group labels shown on the dropdown parent in the header. */
+    group: {
+      results: 'Rezultati',
+      awards: 'Nagrade',
+    },
   },
 
   admin: {

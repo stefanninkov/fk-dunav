@@ -10,6 +10,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout';
 
 import { HomePage } from '@/pages/public/HomePage';
 import { KupSankaPage as PublicKupSankaPage } from '@/pages/public/KupSankaPage';
+import { CrossbarPublicPage } from '@/pages/public/CrossbarPage';
 import { GroupsPage } from '@/pages/public/GroupsPage';
 import { SchedulePage } from '@/pages/public/SchedulePage';
 import { ResultsPage } from '@/pages/public/ResultsPage';
@@ -145,6 +146,7 @@ export const router = createBrowserRouter(
             { path: '/nagrade', element: <PublicAwardsPage /> },
             { path: '/lutrija', element: <LotteryLivePage /> },
             { path: '/kup-sanka', element: <PublicKupSankaPage /> },
+            { path: '/precka', element: <CrossbarPublicPage /> },
             { path: '/sponzori', element: <SponsorsPage /> },
             { path: '/pravilnik', element: <RulesPage /> },
             { path: '/o-turniru', element: <AboutPage /> },

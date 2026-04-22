@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, orderBy, query } from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
 
-import { awardsCol, crossbarCol, fanPollsCol } from '@/lib/firestore/refs';
-import type {
-  Award,
-  AwardId,
-  CrossbarParticipant,
-  FanPoll,
-} from '@/lib/firestore/types';
+import { awardsCol, fanPollsCol } from '@/lib/firestore/refs';
+import type { Award, AwardId, FanPoll } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { FanPollCard } from '@/features/voting/components/FanPollCard';
@@ -31,7 +26,6 @@ const awardOrder: AwardId[] = [
 export function StatisticsPage() {
   const active = useTournamentStore((s) => s.active);
   const [awards, setAwards] = useState<Record<string, Award>>({});
-  const [crossbar, setCrossbar] = useState<CrossbarParticipant[]>([]);
   const [polls, setPolls] = useState<FanPoll[]>([]);
 
   useEffect(() => {
@@ -41,16 +35,11 @@ export function StatisticsPage() {
       for (const d of snap.docs) map[d.id] = d.data();
       setAwards(map);
     });
-    const unsubC = onSnapshot(
-      query(crossbarCol(active.id), orderBy('finalRank', 'asc')),
-      (snap) => setCrossbar(snap.docs.map((d) => d.data())),
-    );
     const unsubPolls = onSnapshot(fanPollsCol(active.id), (snap) =>
       setPolls(snap.docs.map((d) => d.data())),
     );
     return () => {
       unsubA();
-      unsubC();
       unsubPolls();
     };
   }, [active]);
@@ -89,41 +78,6 @@ export function StatisticsPage() {
                   </span>
                   {a.teamName && a.playerName ? (
                     <span className="text-xs text-ink-tertiary">{a.teamName}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section>
-          <h2 className="mb-3 font-display text-xl font-600">{sr.side.crossbar.title}</h2>
-          {crossbar.length === 0 ? (
-            <p className="rounded-md bg-surface-1 px-4 py-6 text-sm text-ink-tertiary">
-              Objavljuje se kada se održi.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {crossbar.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center gap-3 rounded-lg bg-surface-1 px-4 py-3 shadow-card"
-                >
-                  {p.finalRank ? (
-                    <span className="tnum w-8 font-display text-lg font-700 text-brand-400">
-                      {p.finalRank}.
-                    </span>
-                  ) : null}
-                  <div className="flex flex-1 flex-col">
-                    <span className="font-500 text-ink-primary">{p.name}</span>
-                    {p.teamName ? (
-                      <span className="text-xs text-ink-tertiary">{p.teamName}</span>
-                    ) : null}
-                  </div>
-                  {p.qualifyingScore !== undefined ? (
-                    <span className="tnum text-sm text-ink-secondary">
-                      {p.qualifyingScore}/5
-                    </span>
                   ) : null}
                 </li>
               ))}
