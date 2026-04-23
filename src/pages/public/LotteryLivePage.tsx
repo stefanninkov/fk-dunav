@@ -162,6 +162,14 @@ function PrizeRow({
   const hadWinnerRef = useRef<boolean>(!!prize.winnerName);
   const reducedMotion = useUIStore((s) => s.reducedMotion);
 
+  // Parent callbacks identity changes every render — keep them in refs so
+  // the effect below doesn't tear down + re-run mid-shuffle (which was
+  // cancelling the animation before anything visible started).
+  const onShuffleStartRef = useRef(onShuffleStart);
+  const onShuffleEndRef = useRef(onShuffleEnd);
+  onShuffleStartRef.current = onShuffleStart;
+  onShuffleEndRef.current = onShuffleEnd;
+
   const [displayName, setDisplayName] = useState<string | null>(prize.winnerName ?? null);
   const [phase, setPhase] = useState<'idle' | 'shuffling' | 'settled'>(
     prize.winnerName ? 'settled' : 'idle',
@@ -191,12 +199,12 @@ function PrizeRow({
     if (reducedMotion || poolRef.current.length === 0) {
       setDisplayName(currentWinner);
       setPhase('settled');
-      onShuffleEnd(currentWinner);
+      onShuffleEndRef.current(currentWinner);
       return;
     }
 
     setPhase('shuffling');
-    onShuffleStart();
+    onShuffleStartRef.current();
     const startedAt = Date.now();
     let cancelled = false;
     const tick = () => {
@@ -205,7 +213,7 @@ function PrizeRow({
       if (elapsed >= SHUFFLE_DURATION_MS) {
         setDisplayName(currentWinner);
         setPhase('settled');
-        onShuffleEnd(currentWinner);
+        onShuffleEndRef.current(currentWinner);
         const row = rowRef.current;
         const badge = badgeRef.current;
         if (row) {
@@ -246,7 +254,7 @@ function PrizeRow({
     return () => {
       cancelled = true;
     };
-  }, [prize.winnerName, reducedMotion, onShuffleStart, onShuffleEnd]);
+  }, [prize.winnerName, reducedMotion]);
 
   const drawn = phase === 'settled';
 
