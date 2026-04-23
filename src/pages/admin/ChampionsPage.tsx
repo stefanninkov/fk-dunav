@@ -163,26 +163,31 @@ function ChampionDialog({
     setBusy(true);
     try {
       const docId = form.year;
-      const editionNum = form.edition ? Number(form.edition) : undefined;
-      await setDoc(
-        championDoc(docId),
-        {
-          year: yearNum,
-          edition: Number.isInteger(editionNum) ? editionNum : undefined,
-          tournamentName: form.tournamentName.trim() || undefined,
-          championTeamName: form.championTeamName.trim(),
-          championLogoUrl: form.championLogoUrl.trim() || undefined,
-          runnerUpTeamName: form.runnerUpTeamName.trim() || undefined,
-          thirdPlaceTeamName: form.thirdPlaceTeamName.trim() || undefined,
-          mvpPlayerName: form.mvpPlayerName.trim() || undefined,
-          topScorerName: form.topScorerName.trim() || undefined,
-          notes: form.notes.trim() || undefined,
-          createdAt: initial?.createdAt ?? serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          updatedBy: uid,
-        } as unknown as Champion,
-        { merge: true },
-      );
+      const editionNum = form.edition ? Number(form.edition) : NaN;
+      const payload: Record<string, unknown> = {
+        year: yearNum,
+        championTeamName: form.championTeamName.trim(),
+        createdAt: initial?.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      };
+      const put = (key: string, value: string | number | undefined) => {
+        if (value === undefined) return;
+        if (typeof value === 'string') {
+          if (value) payload[key] = value;
+        } else if (Number.isFinite(value)) {
+          payload[key] = value;
+        }
+      };
+      put('edition', Number.isInteger(editionNum) ? editionNum : undefined);
+      put('tournamentName', form.tournamentName.trim());
+      put('championLogoUrl', form.championLogoUrl.trim());
+      put('runnerUpTeamName', form.runnerUpTeamName.trim());
+      put('thirdPlaceTeamName', form.thirdPlaceTeamName.trim());
+      put('mvpPlayerName', form.mvpPlayerName.trim());
+      put('topScorerName', form.topScorerName.trim());
+      put('notes', form.notes.trim());
+      await setDoc(championDoc(docId), payload as unknown as Champion, { merge: true });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : sr.common.errorGeneric);

@@ -16,6 +16,7 @@ import type {
   FanPollCandidate,
   FanPollId,
 } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export async function upsertPoll(
   tournamentId: string,
@@ -24,9 +25,7 @@ export async function upsertPoll(
 ): Promise<void> {
   await setDoc(
     fanPollDoc(tournamentId, pollId),
-    {
-      ...patch,
-    } as unknown as FanPoll,
+    stripUndefined({ ...patch }) as unknown as FanPoll,
     { merge: true },
   );
 }
@@ -51,7 +50,7 @@ export async function addCandidate(
 ): Promise<void> {
   const candidates = [
     ...existing,
-    { ...candidate, voteCount: 0 },
+    { ...stripUndefined(candidate), voteCount: 0 } as FanPollCandidate,
   ];
   await updateDoc(fanPollDoc(tournamentId, pollId), { candidates });
 }

@@ -6,6 +6,7 @@ import {
 
 import { awardDoc } from '@/lib/firestore/refs';
 import type { Award, AwardEntityType, AwardId } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export interface AwardInput {
   id: AwardId;
@@ -30,7 +31,7 @@ export async function setAward(
 ): Promise<void> {
   await setDoc(
     awardDoc(tournamentId, input.id),
-    {
+    stripUndefined({
       type: input.type,
       teamId: input.teamId,
       teamName: input.teamName,
@@ -40,7 +41,7 @@ export async function setAward(
       teamOfTournamentPlayerIds: input.teamOfTournamentPlayerIds,
       description: input.description,
       awardedAt: serverTimestamp(),
-    } as unknown as Award,
+    }) as unknown as Award,
     { merge: true },
   );
 }

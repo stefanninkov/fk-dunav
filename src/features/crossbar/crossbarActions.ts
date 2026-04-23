@@ -8,6 +8,7 @@ import {
 import { db } from '@/lib/firebase';
 import { crossbarCol, crossbarDoc } from '@/lib/firestore/refs';
 import type { CrossbarParticipant } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export interface CreateCrossbarInput {
   name: string;
@@ -24,7 +25,7 @@ export async function createCrossbarParticipant(
 ): Promise<string> {
   const ref = doc(crossbarCol(tournamentId));
   const batch = writeBatch(db);
-  batch.set(ref, input as unknown as CrossbarParticipant);
+  batch.set(ref, stripUndefined(input) as unknown as CrossbarParticipant);
   await batch.commit();
   return ref.id;
 }
@@ -34,7 +35,7 @@ export async function updateCrossbarParticipant(
   id: string,
   patch: Partial<CreateCrossbarInput>,
 ): Promise<void> {
-  await updateDoc(crossbarDoc(tournamentId, id), patch);
+  await updateDoc(crossbarDoc(tournamentId, id), stripUndefined(patch));
 }
 
 export async function deleteCrossbarParticipant(

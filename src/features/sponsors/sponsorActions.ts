@@ -8,6 +8,7 @@ import {
 import { db } from '@/lib/firebase';
 import { sponsorDoc, sponsorsCol } from '@/lib/firestore/refs';
 import type { Sponsor, SponsorTier } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export interface CreateSponsorInput {
   name: string;
@@ -25,7 +26,7 @@ export async function createSponsor(
 ): Promise<string> {
   const ref = doc(sponsorsCol(tournamentId));
   const batch = writeBatch(db);
-  batch.set(ref, input as unknown as Sponsor);
+  batch.set(ref, stripUndefined(input) as unknown as Sponsor);
   await batch.commit();
   return ref.id;
 }
@@ -35,7 +36,7 @@ export async function updateSponsor(
   id: string,
   patch: Partial<CreateSponsorInput>,
 ): Promise<void> {
-  await updateDoc(sponsorDoc(tournamentId, id), patch);
+  await updateDoc(sponsorDoc(tournamentId, id), stripUndefined(patch));
 }
 
 export async function deleteSponsor(

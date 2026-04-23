@@ -8,6 +8,7 @@ import {
 import { db } from '@/lib/firebase';
 import { teamDoc, teamsCol } from '@/lib/firestore/refs';
 import type { Team } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export interface CreateTeamInput {
   name: string;
@@ -24,17 +25,20 @@ export async function createTeam(
 ): Promise<string> {
   const ref = doc(teamsCol(tournamentId));
   const batch = writeBatch(db);
-  batch.set(ref, {
-    name: input.name,
-    shortName: input.shortName,
-    groupId: input.groupId,
-    color: input.color,
-    captainName: input.captainName,
-    logoUrl: input.logoUrl,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    deletedAt: null,
-  } as unknown as Team);
+  batch.set(
+    ref,
+    stripUndefined({
+      name: input.name,
+      shortName: input.shortName,
+      groupId: input.groupId,
+      color: input.color,
+      captainName: input.captainName,
+      logoUrl: input.logoUrl,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      deletedAt: null,
+    }) as unknown as Team,
+  );
   await batch.commit();
   return ref.id;
 }
@@ -45,7 +49,7 @@ export async function updateTeam(
   patch: Partial<CreateTeamInput>,
 ): Promise<void> {
   await updateDoc(teamDoc(tournamentId, teamId), {
-    ...patch,
+    ...stripUndefined(patch),
     updatedAt: serverTimestamp(),
   });
 }

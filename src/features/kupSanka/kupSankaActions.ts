@@ -1,5 +1,6 @@
 import {
   deleteDoc,
+  deleteField,
   doc,
   serverTimestamp,
   setDoc,
@@ -21,9 +22,10 @@ export async function createKupSankaEntry(
   updatedBy: string,
 ): Promise<string> {
   const ref = doc(kupSankaCol(tournamentId));
+  const note = input.note?.trim();
   await setDoc(ref, {
     name: input.name.trim(),
-    note: input.note?.trim() || undefined,
+    ...(note ? { note } : {}),
     bokala: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -51,9 +53,12 @@ export async function updateKupSankaEntry(
   patch: { name?: string; note?: string },
   updatedBy: string,
 ): Promise<void> {
+  const trimmedNote = patch.note?.trim();
   await updateDoc(kupSankaDoc(tournamentId, entryId), {
     ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-    ...(patch.note !== undefined ? { note: patch.note.trim() || undefined } : {}),
+    ...(patch.note !== undefined
+      ? { note: trimmedNote ? trimmedNote : deleteField() }
+      : {}),
     updatedAt: serverTimestamp(),
     updatedBy,
   });

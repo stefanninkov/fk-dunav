@@ -31,9 +31,10 @@ export async function createLotteryParticipant(
   createdBy: string,
 ): Promise<string> {
   const ref = doc(lotteryParticipantsCol(tournamentId));
+  const note = input.note?.trim();
   await setDoc(ref, {
     name: input.name.trim(),
-    note: input.note?.trim() || undefined,
+    ...(note ? { note } : {}),
     createdAt: serverTimestamp(),
     createdBy,
   } as unknown as LotteryParticipant);
