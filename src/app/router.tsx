@@ -31,8 +31,10 @@ import { PublicAwardsPage } from '@/pages/public/PublicAwardsPage';
 import { LotteryLivePage } from '@/pages/public/LotteryLivePage';
 
 import { AuthGuard } from '@/components/guards/AuthGuard';
+import { CapabilityGuard } from '@/components/guards/CapabilityGuard';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
 import { sr } from '@/i18n/sr';
+import type { Capability } from '@/lib/firestore/types';
 
 /**
  * Admin routes are lazy-loaded so the public bundle doesn't ship React Hook
@@ -114,6 +116,18 @@ function lazyRoute(node: React.ReactNode) {
 }
 
 /**
+ * Wrap a lazy admin page with a capability gate. `cap=undefined` means the
+ * route is admin-only (staff users get redirected back to /admin).
+ */
+function capRoute(node: React.ReactNode, cap?: Capability) {
+  return (
+    <Suspense fallback={<AdminFallback />}>
+      <CapabilityGuard cap={cap}>{node}</CapabilityGuard>
+    </Suspense>
+  );
+}
+
+/**
  * BASE_URL is the Vite build-time base path ('/fk-dunav/' on GitHub Pages
  * project page, '/' in dev or on a custom domain). React Router needs this
  * as basename so it strips the prefix when matching routes.
@@ -164,23 +178,23 @@ export const router = createBrowserRouter(
           ),
           children: [
             { index: true, element: lazyRoute(<AdminHomePage />) },
-            { path: 'turnir', element: lazyRoute(<TournamentPage />) },
-            { path: 'timovi', element: lazyRoute(<AdminTeamsPage />) },
-            { path: 'raspored', element: lazyRoute(<AdminSchedulePage />) },
-            { path: 'utakmice', element: lazyRoute(<AdminMatchesPage />) },
-            { path: 'utakmice/:matchId', element: lazyRoute(<AdminMatchEditorPage />) },
-            { path: 'bracket', element: lazyRoute(<AdminBracketPage />) },
-            { path: 'nagrade', element: lazyRoute(<AdminAwardsPage />) },
-            { path: 'obavestenja', element: lazyRoute(<AdminAnnouncementsPage />) },
-            { path: 'sponzori', element: lazyRoute(<AdminSponsorsPage />) },
-            { path: 'kup-sanka', element: lazyRoute(<AdminKupSankaPage />) },
-            { path: 'precka', element: lazyRoute(<AdminCrossbarPage />) },
-            { path: 'sadrzaj', element: lazyRoute(<ContentAdminPage />) },
-            { path: 'galerija', element: lazyRoute(<AdminGalleryPage />) },
-            { path: 'korisnici', element: lazyRoute(<AdminUsersPage />) },
-            { path: 'glasanje', element: lazyRoute(<AdminVotingPage />) },
-            { path: 'sampioni', element: lazyRoute(<AdminChampionsPage />) },
-            { path: 'lutrija', element: lazyRoute(<AdminLotteryPage />) },
+            { path: 'turnir', element: capRoute(<TournamentPage />) },
+            { path: 'timovi', element: capRoute(<AdminTeamsPage />, 'teams') },
+            { path: 'raspored', element: capRoute(<AdminSchedulePage />, 'matches') },
+            { path: 'utakmice', element: capRoute(<AdminMatchesPage />, 'matches') },
+            { path: 'utakmice/:matchId', element: capRoute(<AdminMatchEditorPage />, 'matches') },
+            { path: 'bracket', element: capRoute(<AdminBracketPage />, 'matches') },
+            { path: 'nagrade', element: capRoute(<AdminAwardsPage />, 'side_events') },
+            { path: 'obavestenja', element: capRoute(<AdminAnnouncementsPage />, 'content') },
+            { path: 'sponzori', element: capRoute(<AdminSponsorsPage />, 'content') },
+            { path: 'kup-sanka', element: capRoute(<AdminKupSankaPage />, 'side_events') },
+            { path: 'precka', element: capRoute(<AdminCrossbarPage />, 'side_events') },
+            { path: 'sadrzaj', element: capRoute(<ContentAdminPage />, 'content') },
+            { path: 'galerija', element: capRoute(<AdminGalleryPage />, 'photos') },
+            { path: 'korisnici', element: capRoute(<AdminUsersPage />) },
+            { path: 'glasanje', element: capRoute(<AdminVotingPage />, 'content') },
+            { path: 'sampioni', element: capRoute(<AdminChampionsPage />) },
+            { path: 'lutrija', element: capRoute(<AdminLotteryPage />, 'side_events') },
             { path: '*', element: <Navigate to="/admin" replace /> },
           ],
         },

@@ -72,6 +72,13 @@ async function seedActiveTournament(tid: string) {
   });
 }
 
+async function seedStaff(uid: string, email: string, caps: string[]) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', uid), { uid, email, caps });
+  });
+}
+
 // Tests -----------------------------------------------------------------------
 
 describe('/adminEmails', () => {
@@ -274,5 +281,172 @@ describe('/photoRateLimits', () => {
       }),
     );
     await assertFails(getDoc(doc(user('uRando'), 'photoRateLimits', 'abc')));
+  });
+});
+
+describe('capability gating', () => {
+  it('matches cap gates match writes', async () => {
+    await seedActiveTournament('t1');
+    await seedStaff('uMatch', 'match@example.com', ['matches']);
+    await seedStaff('uContent', 'content@example.com', ['content']);
+
+    await assertSucceeds(
+      setDoc(doc(user('uMatch', 'match@example.com'), 'tournaments/t1/matches/m1'), {
+        phase: 'group',
+        status: 'scheduled',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(user('uContent', 'content@example.com'), 'tournaments/t1/matches/m2'), {
+        phase: 'group',
+        status: 'scheduled',
+      }),
+    );
+  });
+
+  it('side_events cap gates lottery writes; matches cap does not', async () => {
+    await seedActiveTournament('t1');
+    await seedStaff('uSide', 'side@example.com', ['side_events']);
+    await seedStaff('uMatch', 'match@example.com', ['matches']);
+
+    await assertSucceeds(
+      setDoc(doc(user('uSide', 'side@example.com'), 'tournaments/t1/lottery/p1'), {
+        label: 'x',
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(user('uMatch', 'match@example.com'), 'tournaments/t1/lottery/p1'), {
+        label: 'x',
+        order: 0,
+      }),
+    );
+  });
+
+  it('content cap gates announcements + sponsors', async () => {
+    await seedActiveTournament('t1');
+    await seedStaff('uContent', 'c@example.com', ['content']);
+    await seedStaff('uPhotos', 'p@example.com', ['photos']);
+
+    await assertSucceeds(
+      setDoc(doc(user('uContent', 'c@example.com'), 'tournaments/t1/announcements/a1'), {
+        title: 't',
+        body: 'b',
+        severity: 'info',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(user('uPhotos', 'p@example.com'), 'tournaments/t1/announcements/a2'), {
+        title: 't',
+        body: 'b',
+        severity: 'info',
+      }),
+    );
+  });
+
+  it('teams cap gates team writes', async () => {
+    await seedActiveTournament('t1');
+    await seedStaff('uTeams', 't@example.com', ['teams']);
+    await seedStaff('uPhotos', 'p@example.com', ['photos']);
+
+    await assertSucceeds(
+      setDoc(doc(user('uTeams', 't@example.com'), 'tournaments/t1/teams/team1'), {
+        name: 'X',
+        groupId: 'g1',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(user('uPhotos', 'p@example.com'), 'tournaments/t1/teams/team2'), {
+        name: 'X',
+        groupId: 'g1',
+      }),
+    );
+  });
+
+  it('admin bypasses capability checks', async () => {
+    await seedActiveTournament('t1');
+    await seedAdmin('uAdmin', 'admin@example.com');
+    await assertSucceeds(
+      setDoc(doc(user('uAdmin', 'admin@example.com'), 'tournaments/t1/matches/m1'), {
+        phase: 'group',
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(user('uAdmin', 'admin@example.com'), 'tournaments/t1/lottery/p1'), {
+        label: 'x',
+      }),
+    );
+  });
+
+  it('anonymous / unkown user has no caps', async () => {
+    await seedActiveTournament('t1');
+    await assertFails(
+      setDoc(doc(user('uGhost', 'ghost@example.com'), 'tournaments/t1/matches/m1'), {
+        phase: 'group',
+      }),
+    );
+  });
+});
+
+describe('/users self-promotion', () => {
+  it('allows self-promotion with invite caps', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'invites', 'alice@example.com'), {
+        email: 'alice@example.com',
+        caps: ['matches', 'photos'],
+        revoked: false,
+      });
+    });
+    await assertSucceeds(
+      setDoc(doc(user('uAlice', 'alice@example.com'), 'users', 'uAlice'), {
+        uid: 'uAlice',
+        email: 'alice@example.com',
+        caps: ['matches', 'photos'],
+      }),
+    );
+  });
+
+  it('rejects self-promotion with extra caps beyond invite', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'invites', 'bob@example.com'), {
+        email: 'bob@example.com',
+        caps: ['matches'],
+        revoked: false,
+      });
+    });
+    await assertFails(
+      setDoc(doc(user('uBob', 'bob@example.com'), 'users', 'uBob'), {
+        uid: 'uBob',
+        email: 'bob@example.com',
+        caps: ['matches', 'content'], // extra "content" cap not granted
+      }),
+    );
+  });
+
+  it('rejects self-promotion on revoked invite', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'invites', 'carol@example.com'), {
+        email: 'carol@example.com',
+        caps: ['matches'],
+        revoked: true,
+      });
+    });
+    await assertFails(
+      setDoc(doc(user('uCarol', 'carol@example.com'), 'users', 'uCarol'), {
+        uid: 'uCarol',
+        email: 'carol@example.com',
+        caps: ['matches'],
+      }),
+    );
+  });
+
+  it('rejects self-promotion without an invite', async () => {
+    await assertFails(
+      setDoc(doc(user('uEve', 'eve@example.com'), 'users', 'uEve'), {
+        uid: 'uEve',
+        email: 'eve@example.com',
+        caps: ['matches'],
+      }),
+    );
   });
 });

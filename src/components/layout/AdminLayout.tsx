@@ -27,35 +27,60 @@ import {
 import logoUrl from '@/assets/logo.svg';
 import { auth } from '@/lib/firebase';
 import { sr } from '@/i18n/sr';
+import type { Capability } from '@/lib/firestore/types';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { OfflineBadge } from '@/components/ui/OfflineBadge';
 
-const navItems = [
-  { to: '/admin', label: sr.admin.nav.dashboard, icon: LayoutDashboard, end: true },
-  { to: '/admin/utakmice', label: sr.admin.nav.matches, icon: ListOrdered },
-  { to: '/admin/timovi', label: sr.admin.nav.teams, icon: Users },
-  { to: '/admin/raspored', label: sr.admin.nav.schedule, icon: CalendarDays },
-  { to: '/admin/bracket', label: sr.admin.nav.bracket, icon: Trophy },
-  { to: '/admin/galerija', label: sr.admin.nav.gallery, icon: ImageIcon },
-  { to: '/admin/obavestenja', label: sr.admin.nav.announcements, icon: Megaphone },
-  { to: '/admin/sponzori', label: sr.admin.nav.sponsors, icon: BadgeDollarSign },
-  { to: '/admin/kup-sanka', label: sr.admin.nav.kupSanka, icon: Beer },
-  { to: '/admin/precka', label: sr.admin.nav.crossbar, icon: Target },
-  { to: '/admin/nagrade', label: sr.admin.nav.awards, icon: Award },
-  { to: '/admin/lutrija', label: sr.nav.lottery, icon: Ticket },
-  { to: '/admin/sadrzaj', label: 'Sadržaj', icon: FileText },
+/**
+ * Nav items with an optional `cap` — the sidebar hides any item whose cap
+ * the current user doesn't hold. Items with no cap are admin-only; items
+ * marked `always: true` show up for every signed-in user (dashboard only).
+ */
+interface NavItemDef {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+  cap?: Capability;
+  always?: boolean;
+}
+
+const allNavItems: NavItemDef[] = [
+  { to: '/admin', label: sr.admin.nav.dashboard, icon: LayoutDashboard, end: true, always: true },
+  { to: '/admin/utakmice', label: sr.admin.nav.matches, icon: ListOrdered, cap: 'matches' },
+  { to: '/admin/raspored', label: sr.admin.nav.schedule, icon: CalendarDays, cap: 'matches' },
+  { to: '/admin/bracket', label: sr.admin.nav.bracket, icon: Trophy, cap: 'matches' },
+  { to: '/admin/timovi', label: sr.admin.nav.teams, icon: Users, cap: 'teams' },
+  { to: '/admin/galerija', label: sr.admin.nav.gallery, icon: ImageIcon, cap: 'photos' },
+  { to: '/admin/obavestenja', label: sr.admin.nav.announcements, icon: Megaphone, cap: 'content' },
+  { to: '/admin/sponzori', label: sr.admin.nav.sponsors, icon: BadgeDollarSign, cap: 'content' },
+  { to: '/admin/sadrzaj', label: 'Sadržaj', icon: FileText, cap: 'content' },
+  { to: '/admin/glasanje', label: sr.admin.nav.voting, icon: Vote, cap: 'content' },
+  { to: '/admin/kup-sanka', label: sr.admin.nav.kupSanka, icon: Beer, cap: 'side_events' },
+  { to: '/admin/precka', label: sr.admin.nav.crossbar, icon: Target, cap: 'side_events' },
+  { to: '/admin/nagrade', label: sr.admin.nav.awards, icon: Award, cap: 'side_events' },
+  { to: '/admin/lutrija', label: sr.nav.lottery, icon: Ticket, cap: 'side_events' },
   { to: '/admin/turnir', label: sr.admin.nav.tournament, icon: Settings },
   { to: '/admin/korisnici', label: sr.admin.nav.users, icon: UserCog },
-  { to: '/admin/glasanje', label: sr.admin.nav.voting, icon: Vote },
   { to: '/admin/sampioni', label: sr.admin.nav.champions, icon: History },
 ];
+
+function visibleNavItems(role: 'admin' | 'staff' | null, caps: Capability[]): NavItemDef[] {
+  if (role === 'admin') return allNavItems;
+  if (role !== 'staff') return allNavItems.filter((i) => i.always);
+  const capSet = new Set(caps);
+  return allNavItems.filter((i) => i.always || (i.cap && capSet.has(i.cap)));
+}
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const email = useAuthStore((s) => s.email);
   const role = useAuthStore((s) => s.role);
+  const caps = useAuthStore((s) => s.caps);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+
+  const navItems = visibleNavItems(role, caps);
 
   // Close the drawer on route change.
   useEffect(() => setDrawerOpen(false), [location.pathname]);

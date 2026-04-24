@@ -424,11 +424,38 @@ export interface AdminEmail {
   addedBy?: string;
 }
 
+/**
+ * Capabilities — granular access flags attached to an invite and copied
+ * onto the /users/{uid} doc on first sign-in. Admins (emails in
+ * /adminEmails) implicitly hold every capability; everyone else is the
+ * intersection of what the admin granted.
+ *   - matches: score + events + clock on /admin/utakmice and /admin/raspored
+ *   - teams: team + roster editor (/admin/timovi)
+ *   - photos: moderate submissions (/admin/galerija)
+ *   - side_events: Kup Šanka, Prečka, Lutrija, awards entry
+ *   - content: announcements, sponsors, content pages, fan polls
+ */
+export type Capability =
+  | 'matches'
+  | 'teams'
+  | 'photos'
+  | 'side_events'
+  | 'content';
+
+export const ALL_CAPABILITIES: Capability[] = [
+  'matches',
+  'teams',
+  'photos',
+  'side_events',
+  'content',
+];
+
 export interface AppUser {
   uid: string;
   email: string;
   displayName?: string;
   photoUrl?: string;
+  caps: Capability[];
   createdAt: Timestamp;
   lastLogin: Timestamp;
   notes?: string;
@@ -437,12 +464,10 @@ export interface AppUser {
 // ---------------------------------------------------------------------------
 // Invite (email → role grant on first sign-in)
 
-export type InviteRole = 'reporter' | 'admin';
-
 export interface Invite {
   id: string;
   email: string;
-  role: InviteRole;
+  caps: Capability[];
   invitedBy: string;
   invitedAt: Timestamp;
   consumedAt?: Timestamp;

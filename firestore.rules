@@ -1,23 +1,18 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Firestore rules — Phase 2 (data layer). Re-deploy trigger.
+// Firestore rules — capability-based access.
 //
-// Core invariants:
-//  - Public can read active/archived tournaments and all their child
-//    collections. Draft tournaments are admin-only.
-//  - Reporters can write matches + players. Admins do everything else.
-//  - /adminEmails is readable by signed-in users (so AppRoot can self-
-//    promote on the Spark plan). Non-writable from the client.
-//  - /admins/{uid} is the authoritative role cache: the client writes
-//    it once, at sign-in, only if its own email appears in /adminEmails
-//    under a doc whose id is the user's email. Every other collection
-//    checks isAdmin() against that doc.
-//  - Everything not explicitly allowed is denied.
+// Admins (emails in /adminEmails) hold every capability. Everyone else
+// gets what the admin granted via /invites → /users/{uid}.caps. Each
+// protected collection checks the specific capability it needs.
+//
+// Capabilities: matches, teams, photos, side_events, content.
 //
 // Seed prerequisites:
 //  - /adminEmails must contain one doc with id === the admin's email,
-//    e.g. /adminEmails/stefan.ninkov@gmail.com with field email:"stefan.ninkov@gmail.com".
+//    e.g. /adminEmails/stefan.ninkov@gmail.com with field
+//    email:"stefan.ninkov@gmail.com".
 // ------------------------------------------------------------------
 
 service cloud.firestore {
@@ -27,20 +22,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasClaim(role) {
-      return isSignedIn() && request.auth.token.role == role;
-    }
-
-    // Admin custom claim (future Cloud Function path) OR an /admins/{uid}
-    // doc that was seeded on first sign-in.
     function isAdmin() {
-      return hasClaim('admin')
-             || (isSignedIn()
-                 && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    function isReporterOrAdmin() {
-      return hasClaim('reporter') || isAdmin();
+    function userCaps() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.caps;
+    }
+
+    function hasCap(cap) {
+      return isAdmin()
+             || (isSignedIn()
+                 && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                 && cap in userCaps());
+    }
+
+    function inviteCapsForCaller() {
+      return get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.caps;
     }
 
     // ------------------------------------------------------------
@@ -53,8 +52,6 @@ service cloud.firestore {
 
     // ------------------------------------------------------------
     // /admins/{uid} — role cache written by client on self-promotion.
-    // Allowed to create only if the caller's email has a matching doc
-    // in /adminEmails (doc id = email). Updates and deletes are closed.
     // ------------------------------------------------------------
     match /admins/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
@@ -67,15 +64,36 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------
-    // /users — profile docs
+    // /users — staff docs. Admin read/write any; a caller may read
+    // their own doc and may self-promote ONCE using the invite caps.
     // ------------------------------------------------------------
     match /users/{uid} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+
+      // First-time consumption: caller writes /users/{own uid} with caps
+      // that exactly match their active invite's caps. Email must match
+      // the auth token. Invite must not be revoked.
+      allow create: if isSignedIn()
+                     && request.auth.uid == uid
+                     && request.auth.token.email != null
+                     && request.resource.data.email == request.auth.token.email
+                     && exists(/databases/$(database)/documents/invites/$(request.auth.token.email))
+                     && get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.revoked == false
+                     && request.resource.data.caps.hasAll(inviteCapsForCaller())
+                     && request.resource.data.caps.hasOnly(inviteCapsForCaller());
+
+      allow update: if isAdmin()
+                     // Or the user updating their own last-login / profile
+                     // data without escalating caps (admin is the only one
+                     // who can change caps on an existing doc).
+                     || (isSignedIn()
+                         && request.auth.uid == uid
+                         && request.resource.data.caps == resource.data.caps);
+      allow delete: if isAdmin();
     }
 
     // ------------------------------------------------------------
-    // /invites — reporter / admin invites by email (doc id = email)
+    // /invites — capability grants keyed by email (doc id = email)
     // ------------------------------------------------------------
     match /invites/{email} {
       allow read, write: if isAdmin();
@@ -86,81 +104,77 @@ service cloud.firestore {
     // ------------------------------------------------------------
     match /tournaments/{tid} {
       allow read: if resource.data.status != 'draft' || isAdmin();
-      // Listing (e.g. /admin/turnir) must be allowed for admins too.
-      // Firestore evaluates list rules per-doc; drafts will still be
-      // denied to non-admins.
       allow list: if true;
       allow create, update: if isAdmin();
       allow delete: if false;
 
       match /groups/{gid} {
         allow read: if true;
-        allow write: if isAdmin();
+        allow write: if hasCap('teams');
       }
 
       match /teams/{teamId} {
         allow read: if true;
-        allow create, update: if isReporterOrAdmin();
-        allow delete: if false;
+        allow write: if hasCap('teams');
       }
 
       match /players/{playerId} {
         allow read: if true;
-        allow create, update: if isReporterOrAdmin();
-        allow delete: if false;
+        allow write: if hasCap('teams');
       }
 
       match /matches/{matchId} {
         allow read: if true;
-        allow write: if isReporterOrAdmin();
+        allow write: if hasCap('matches');
 
         match /events/{eventId} {
           allow read: if true;
-          allow create: if isReporterOrAdmin();
+          allow create: if hasCap('matches');
           allow update, delete: if isAdmin();
         }
       }
 
       match /standings/{teamId} {
         allow read: if true;
-        allow write: if isAdmin(); // until Cloud Function takes over
+        // Cloud Function via Admin SDK bypasses rules; keep admin fallback
+        // for the rare manual fix.
+        allow write: if isAdmin();
       }
 
       match /photos/{photoId} {
-        // Public sees approved only; admins see everything (incl. pending).
-        allow read: if (resource != null && resource.data.status == 'approved') || isAdmin();
-        // Anonymous submissions go through the `createPhotoRecord` Cloud
-        // Function (which rate-limits by IP and writes as admin). Direct
-        // client creates are disallowed so the rate-limit path is the only
-        // public entry point into this collection.
+        // Public sees approved only; staff with the photos cap see
+        // everything so they can moderate pending submissions.
+        allow read: if (resource != null && resource.data.status == 'approved')
+                     || hasCap('photos');
+        // Anonymous submissions go through the createPhotoRecord Cloud
+        // Function (rate-limited, writes as admin). Direct client creates
+        // remain disallowed.
         allow create: if isAdmin();
-        allow update, delete: if isAdmin();
+        allow update, delete: if hasCap('photos');
       }
-      match /announcements/{id} { allow read: if true; allow write: if isAdmin(); }
-      match /sponsors/{id}      { allow read: if true; allow write: if isAdmin(); }
-      match /kupSanka/{teamId}  { allow read: if true; allow write: if isReporterOrAdmin(); }
-      match /crossbar/{pid}     { allow read: if true; allow write: if isAdmin(); }
-      match /awards/{awardId}   { allow read: if true; allow write: if isAdmin(); }
-      match /lottery/{prizeId}  { allow read: if true; allow write: if isAdmin(); }
-      match /lotteryParticipants/{pid} { allow read: if true; allow write: if isAdmin(); }
-      match /lotterySession/{sid} { allow read: if true; allow write: if isAdmin(); }
-      match /content/{pageId}   { allow read: if true; allow write: if isAdmin(); }
+
+      match /announcements/{id} { allow read: if true; allow write: if hasCap('content'); }
+      match /sponsors/{id}      { allow read: if true; allow write: if hasCap('content'); }
+      match /kupSanka/{id}      { allow read: if true; allow write: if hasCap('side_events'); }
+      match /crossbar/{pid}     { allow read: if true; allow write: if hasCap('side_events'); }
+      match /awards/{awardId}   { allow read: if true; allow write: if hasCap('side_events'); }
+      match /lottery/{prizeId}  { allow read: if true; allow write: if hasCap('side_events'); }
+      match /lotteryParticipants/{pid} { allow read: if true; allow write: if hasCap('side_events'); }
+      match /lotterySession/{sid}      { allow read: if true; allow write: if hasCap('side_events'); }
+      match /content/{pageId}   { allow read: if true; allow write: if hasCap('content'); }
+
       match /fanVotes/{pollId} {
         allow read: if true;
-        // Admins curate the poll + candidates. Public writes (vote count
-        // denormalized on the poll doc) are allowed when a vote subdoc is
-        // simultaneously created — the batched write covers both.
-        allow create, update: if isAdmin()
+        // Content cap curates the poll. Public writes (vote count
+        // denormalized on the poll doc) are allowed on an open poll.
+        allow create, update: if hasCap('content')
           || (request.resource.data.keys().hasAll(['candidates'])
               && resource != null
               && resource.data.status == 'open');
-        allow delete: if isAdmin();
+        allow delete: if hasCap('content');
 
         match /votes/{deviceId} {
           allow read: if false;
-          // Anyone can create their own vote once; doc id = deviceId so a
-          // duplicate vote from the same device is rejected by the
-          // "create-only" rule (update/delete closed).
           allow create: if get(/databases/$(database)/documents/tournaments/$(tid)/fanVotes/$(pollId)).data.status == 'open';
           allow update, delete: if false;
         }
@@ -168,24 +182,20 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------
-    // /champions — historical tournament winners (top-level). Public
-    // read, admin write. Doc id = year (e.g. '2025').
+    // /champions — historical tournament winners (top-level).
     // ------------------------------------------------------------
     match /champions/{year} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // /photoRateLimits — per-IP-hash submission bucket written only by the
+    // /photoRateLimits — per-IP-hash bucket written only by the
     // createPhotoRecord Cloud Function via Admin SDK. No client access.
     match /photoRateLimits/{ipHash} {
       allow read, write: if false;
     }
 
     // Anonymous push subscriptions — id is the FCM registration token.
-    // Any visitor can create/update their own subscription (no auth
-    // required, rate-limited by App Check in practice). Reads are only
-    // for Cloud Functions via the Admin SDK; clients never list this.
     match /pushSubscriptions/{token} {
       allow read: if false;
       allow create, update: if request.resource.data.token == token;
