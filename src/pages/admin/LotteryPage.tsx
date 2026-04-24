@@ -2,16 +2,8 @@ import { useEffect, useState } from 'react';
 import { onSnapshot, orderBy, query } from 'firebase/firestore';
 import { Eye, EyeOff } from 'lucide-react';
 
-import {
-  lotteryCol,
-  lotteryParticipantsCol,
-  lotterySessionDoc,
-} from '@/lib/firestore/refs';
-import type {
-  LotteryParticipant,
-  LotteryPrize,
-  LotterySession,
-} from '@/lib/firestore/types';
+import { lotteryCol, lotterySessionDoc } from '@/lib/firestore/refs';
+import type { LotteryPrize, LotterySession } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
@@ -19,22 +11,17 @@ import { setLotteryDrumVisible } from '@/features/lottery/lotteryActions';
 import { LotteryBoardEditor } from '@/features/lottery/components/LotteryBoardEditor';
 
 /**
- * Standalone admin Lutrija page. Hosts the participants + prizes CRUD
- * (previously nested under /admin/nagrade) and the "drumVisible" session
- * toggle that controls whether the public /lutrija view shows the bubanj.
+ * Standalone admin Lutrija page. Edits the raffle slip count + prize list +
+ * drum visibility. The draw pool is simply integers 1..participantCount.
  */
 export function LotteryPage() {
   const active = useTournamentStore((s) => s.active);
   const uid = useAuthStore((s) => s.uid);
-  const [participants, setParticipants] = useState<LotteryParticipant[]>([]);
   const [prizes, setPrizes] = useState<LotteryPrize[]>([]);
   const [session, setSession] = useState<LotterySession | null>(null);
 
   useEffect(() => {
     if (!active) return;
-    const unsubP = onSnapshot(lotteryParticipantsCol(active.id), (snap) =>
-      setParticipants(snap.docs.map((d) => d.data())),
-    );
     const unsubPrizes = onSnapshot(
       query(lotteryCol(active.id), orderBy('order', 'asc')),
       (snap) => setPrizes(snap.docs.map((d) => d.data())),
@@ -43,7 +30,6 @@ export function LotteryPage() {
       setSession(snap.exists() ? snap.data() : null),
     );
     return () => {
-      unsubP();
       unsubPrizes();
       unsubSession();
     };
@@ -61,6 +47,7 @@ export function LotteryPage() {
   }
 
   const drumVisible = session?.drumVisible ?? false;
+  const participantCount = session?.participantCount ?? 0;
 
   async function toggleDrum() {
     if (!active || !uid) return;
@@ -102,7 +89,7 @@ export function LotteryPage() {
 
       <LotteryBoardEditor
         tournamentId={active.id}
-        participants={participants}
+        participantCount={participantCount}
         prizes={prizes}
         createdBy={uid}
       />

@@ -376,14 +376,19 @@ export interface LotteryPrize {
 }
 
 /**
- * Single-doc session state for the lottery. Admin toggles `drumVisible`
- * to signal "izvlačenje počinje" — the public /lutrija view then renders
- * the big rotating bubanj with participant chips inside. Doc id is fixed
- * at "current".
+ * Single-doc session state for the lottery. Admin sets:
+ *   - `participantCount` — how many raffle slips were sold; draws pick a
+ *     random integer from 1..count excluding already-drawn numbers.
+ *   - `drumVisible` — when true, the public /lutrija view reveals the
+ *     big rotating bubanj with numbered chips inside.
+ *
+ * Doc id is fixed at "current".
  */
 export interface LotterySession {
   id: string;
   drumVisible: boolean;
+  /** Total slips sold — the pool is 1..participantCount. */
+  participantCount: number;
   updatedAt: Timestamp;
   updatedBy: string;
 }

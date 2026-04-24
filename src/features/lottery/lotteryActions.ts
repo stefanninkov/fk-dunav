@@ -2,6 +2,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
   setDoc,
@@ -11,46 +12,14 @@ import {
 import {
   lotteryCol,
   lotteryDoc,
-  lotteryParticipantDoc,
-  lotteryParticipantsCol,
   lotterySessionDoc,
 } from '@/lib/firestore/refs';
-import type {
-  LotteryParticipant,
-  LotteryPrize,
-  LotterySession,
-} from '@/lib/firestore/types';
+import type { LotteryPrize, LotterySession } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 // ---------------------------------------------------------------------------
-// Participants — the raffle pool. Admin enters names upfront; the live draw
-// picks random unassigned participants and writes them onto prize docs.
-
-export async function createLotteryParticipant(
-  tournamentId: string,
-  input: { name: string; note?: string },
-  createdBy: string,
-): Promise<string> {
-  const ref = doc(lotteryParticipantsCol(tournamentId));
-  const note = input.note?.trim();
-  await setDoc(ref, {
-    name: input.name.trim(),
-    ...(note ? { note } : {}),
-    createdAt: serverTimestamp(),
-    createdBy,
-  } as unknown as LotteryParticipant);
-  return ref.id;
-}
-
-export async function deleteLotteryParticipant(
-  tournamentId: string,
-  participantId: string,
-): Promise<void> {
-  await deleteDoc(lotteryParticipantDoc(tournamentId, participantId));
-}
-
-// ---------------------------------------------------------------------------
-// Prizes — the items being drawn. Created empty (no winner); `drawLotteryWinner`
-// mutates them to record the winner during the live event.
+// Prizes — the items being drawn. Created empty (no winner);
+// `drawLotteryWinner` mutates them to record the winning slip number.
 
 export async function createLotteryPrize(
   tournamentId: string,
@@ -72,7 +41,7 @@ export async function updateLotteryPrize(
   prizeId: string,
   patch: { label?: string; order?: number },
 ): Promise<void> {
-  await updateDoc(lotteryDoc(tournamentId, prizeId), patch);
+  await updateDoc(lotteryDoc(tournamentId, prizeId), stripUndefined(patch));
 }
 
 export async function deleteLotteryPrize(
@@ -83,39 +52,49 @@ export async function deleteLotteryPrize(
 }
 
 // ---------------------------------------------------------------------------
-// Draw / undraw. The draw reads all participants and all prizes, filters out
-// anyone already assigned as a winner, picks a uniform random survivor, and
-// writes the winner onto the prize. Not inside a Firestore transaction because
-// we need to list two whole collections — a double-assignment race is possible
-// only if two admins click simultaneously, and `undrawLotteryWinner` is always
-// available as an escape hatch.
+// Draw — picks a random integer in 1..participantCount, excluding any
+// number already recorded as a winner on another prize. Session's
+// participantCount is the single source of truth for the pool.
 
 export async function drawLotteryWinner(
   tournamentId: string,
   prizeId: string,
-): Promise<{ participantId: string; name: string } | null> {
-  const [participantsSnap, prizesSnap] = await Promise.all([
-    getDocs(lotteryParticipantsCol(tournamentId)),
+): Promise<{ number: number } | null> {
+  const [sessionSnap, prizesSnap] = await Promise.all([
+    getDoc(lotterySessionDoc(tournamentId)),
     getDocs(lotteryCol(tournamentId)),
   ]);
 
-  const taken = new Set<string>();
+  const count = sessionSnap.data()?.participantCount ?? 0;
+  if (count <= 0) return null;
+
+  const taken = new Set<number>();
   for (const d of prizesSnap.docs) {
-    const wid = d.data().winnerParticipantId;
-    if (wid) taken.add(wid);
+    const name = d.data().winnerName;
+    if (!name) continue;
+    const n = Number(name);
+    if (Number.isInteger(n)) taken.add(n);
   }
 
-  const remaining = participantsSnap.docs.filter((d) => !taken.has(d.id));
-  if (remaining.length === 0) return null;
+  if (taken.size >= count) return null; // pool exhausted
 
-  const pick = remaining[Math.floor(Math.random() * remaining.length)];
-  const picked = pick.data();
+  // Rejection sample — cheap for small exhaustion ratios; worst case
+  // (one slot left) we loop a few times. Bounded at 2 * count iterations.
+  let pick: number | null = null;
+  for (let i = 0; i < count * 2; i++) {
+    const candidate = Math.floor(Math.random() * count) + 1;
+    if (!taken.has(candidate)) {
+      pick = candidate;
+      break;
+    }
+  }
+  if (pick === null) return null;
+
   await updateDoc(lotteryDoc(tournamentId, prizeId), {
-    winnerParticipantId: pick.id,
-    winnerName: picked.name,
+    winnerName: String(pick),
     drawnAt: serverTimestamp(),
   });
-  return { participantId: pick.id, name: picked.name };
+  return { number: pick };
 }
 
 export async function undrawLotteryWinner(
@@ -123,15 +102,31 @@ export async function undrawLotteryWinner(
   prizeId: string,
 ): Promise<void> {
   await updateDoc(lotteryDoc(tournamentId, prizeId), {
-    winnerParticipantId: deleteField(),
     winnerName: deleteField(),
+    winnerParticipantId: deleteField(), // clean up any legacy field
     drawnAt: deleteField(),
   });
 }
 
 // ---------------------------------------------------------------------------
-// Session — single "current" doc admin flips to signal that the draw is
-// about to start. Public /lutrija watches this and reveals the bubanj.
+// Session — the single "current" doc. Admin sets participantCount and
+// toggles drumVisible; public /lutrija reads both.
+
+export async function setLotteryParticipantCount(
+  tournamentId: string,
+  count: number,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(
+    lotterySessionDoc(tournamentId),
+    {
+      participantCount: Math.max(0, Math.floor(count)),
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    } as unknown as LotterySession,
+    { merge: true },
+  );
+}
 
 export async function setLotteryDrumVisible(
   tournamentId: string,

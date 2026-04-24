@@ -1,44 +1,38 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dices, ExternalLink, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
-import type { LotteryParticipant, LotteryPrize } from '@/lib/firestore/types';
+import type { LotteryPrize } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import {
-  createLotteryParticipant,
   createLotteryPrize,
-  deleteLotteryParticipant,
   deleteLotteryPrize,
   drawLotteryWinner,
+  setLotteryParticipantCount,
   undrawLotteryWinner,
 } from '@/features/lottery/lotteryActions';
 
 interface Props {
   tournamentId: string;
-  participants: LotteryParticipant[];
+  participantCount: number;
   prizes: LotteryPrize[];
   createdBy: string;
 }
 
 /**
- * Admin UI for Lutrija: two sections (participants pool + prizes) and a
- * per-prize "Izvuci" button that atomically picks a random unassigned
- * participant and records them as the winner. The live big screen at
- * /lutrija watches Firestore and animates the reveal.
+ * Admin Lutrija editor. Two sections:
+ *   1. "Broj učesnika" — total raffle slips sold (1..N). The draw picks
+ *      a random integer from this range, excluding already-drawn numbers.
+ *   2. Prize list with per-prize Izvuci / Poništi izvlačenje.
  */
 export function LotteryBoardEditor({
   tournamentId,
-  participants,
+  participantCount,
   prizes,
   createdBy,
 }: Props) {
-  const takenIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of prizes) if (p.winnerParticipantId) set.add(p.winnerParticipantId);
-    return set;
-  }, [prizes]);
-
-  const remainingCount = participants.length - takenIds.size;
+  const drawnCount = prizes.filter((p) => !!p.winnerName).length;
+  const remaining = Math.max(0, participantCount - drawnCount);
 
   return (
     <section className="flex flex-col gap-6">
@@ -54,18 +48,18 @@ export function LotteryBoardEditor({
         </NavLink>
       </header>
 
-      <ParticipantsSection
+      <CountSection
         tournamentId={tournamentId}
-        participants={participants}
-        takenIds={takenIds}
+        participantCount={participantCount}
+        remaining={remaining}
         createdBy={createdBy}
       />
 
       <PrizesSection
         tournamentId={tournamentId}
         prizes={prizes}
-        participants={participants}
-        remainingCount={remainingCount}
+        participantCount={participantCount}
+        remaining={remaining}
         createdBy={createdBy}
       />
     </section>
@@ -74,34 +68,36 @@ export function LotteryBoardEditor({
 
 // ---------------------------------------------------------------------------
 
-function ParticipantsSection({
+function CountSection({
   tournamentId,
-  participants,
-  takenIds,
+  participantCount,
+  remaining,
   createdBy,
 }: {
   tournamentId: string;
-  participants: LotteryParticipant[];
-  takenIds: Set<string>;
+  participantCount: number;
+  remaining: number;
   createdBy: string;
 }) {
-  const [name, setName] = useState('');
-  const [note, setNote] = useState('');
+  const [value, setValue] = useState<string>(String(participantCount || ''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function add() {
-    if (!name.trim()) return;
-    setBusy(true);
+  // Pull remote value into the field when it changes from elsewhere.
+  useEffect(() => {
+    setValue(String(participantCount || ''));
+  }, [participantCount]);
+
+  async function save() {
     setError(null);
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1) {
+      setError(sr.side.lottery.admin.countInvalid);
+      return;
+    }
+    setBusy(true);
     try {
-      await createLotteryParticipant(
-        tournamentId,
-        { name, note: note || undefined },
-        createdBy,
-      );
-      setName('');
-      setNote('');
+      await setLotteryParticipantCount(tournamentId, Math.floor(n), createdBy);
     } catch (e) {
       setError(e instanceof Error ? e.message : sr.common.errorGeneric);
     } finally {
@@ -109,92 +105,42 @@ function ParticipantsSection({
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm(sr.common.delete + '?')) return;
-    await deleteLotteryParticipant(tournamentId, id);
-  }
-
-  const remaining = participants.length - takenIds.size;
-
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-surface-1 p-4 shadow-card">
       <header className="flex items-baseline justify-between gap-3">
         <h3 className="font-display text-base font-600">
-          {sr.side.lottery.admin.participantsTitle}
+          {sr.side.lottery.admin.countTitle}
         </h3>
         <span className="tnum text-xs text-ink-tertiary">
-          {sr.side.lottery.admin.poolSummary(remaining, participants.length)}
+          {sr.side.lottery.admin.poolSummary(remaining, participantCount)}
         </span>
       </header>
 
-      <p className="text-sm text-ink-secondary">{sr.side.lottery.admin.participantsHelp}</p>
+      <p className="text-sm text-ink-secondary">{sr.side.lottery.admin.countHelp}</p>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={sr.side.lottery.admin.participantNamePlaceholder}
-          className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
-        />
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder={sr.side.lottery.admin.participantNotePlaceholder}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={sr.side.lottery.admin.countPlaceholder}
           className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
         />
         <button
           type="button"
-          onClick={add}
-          disabled={busy || !name.trim()}
+          onClick={() => void save()}
+          disabled={busy || !value.trim() || Number(value) === participantCount}
           className="inline-flex h-touch items-center justify-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
         >
-          <Plus size={16} />
-          {sr.side.lottery.admin.addParticipant}
+          {sr.common.save}
         </button>
       </div>
 
       {error ? (
         <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>
       ) : null}
-
-      {participants.length === 0 ? (
-        <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-ink-tertiary">
-          {sr.common.empty}
-        </p>
-      ) : (
-        <ul className="flex flex-col divide-y divide-surface-3 overflow-hidden rounded-md bg-surface-2">
-          {participants.map((p) => {
-            const used = takenIds.has(p.id);
-            return (
-              <li
-                key={p.id}
-                className={`flex items-center gap-3 px-3 py-2 ${used ? 'opacity-50' : ''}`}
-              >
-                <span className="flex-1 text-sm text-ink-primary">
-                  {p.name}
-                  {p.note ? (
-                    <span className="ml-2 text-xs text-ink-tertiary">— {p.note}</span>
-                  ) : null}
-                </span>
-                {used ? (
-                  <span className="text-xs text-ink-tertiary">
-                    {sr.side.lottery.admin.drawn}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void remove(p.id)}
-                  disabled={used}
-                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-3 hover:text-danger disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-ink-tertiary"
-                  title={used ? sr.side.lottery.admin.drawn : sr.common.delete}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </section>
   );
 }
@@ -204,14 +150,14 @@ function ParticipantsSection({
 function PrizesSection({
   tournamentId,
   prizes,
-  participants,
-  remainingCount,
+  participantCount,
+  remaining,
   createdBy,
 }: {
   tournamentId: string;
   prizes: LotteryPrize[];
-  participants: LotteryParticipant[];
-  remainingCount: number;
+  participantCount: number;
+  remaining: number;
   createdBy: string;
 }) {
   const [label, setLabel] = useState('');
@@ -247,7 +193,7 @@ function PrizesSection({
     setError(null);
     try {
       const result = await drawLotteryWinner(tournamentId, prizeId);
-      if (!result) setError(sr.side.lottery.admin.noParticipants);
+      if (!result) setError(sr.side.lottery.admin.noPool);
     } catch (e) {
       setError(e instanceof Error ? e.message : sr.common.errorGeneric);
     } finally {
@@ -260,7 +206,7 @@ function PrizesSection({
     await undrawLotteryWinner(tournamentId, prizeId);
   }
 
-  const canDraw = participants.length > 0 && remainingCount > 0;
+  const canDraw = participantCount > 0 && remaining > 0;
 
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-surface-1 p-4 shadow-card">
@@ -281,7 +227,7 @@ function PrizesSection({
         />
         <button
           type="button"
-          onClick={addPrize}
+          onClick={() => void addPrize()}
           disabled={busy || !label.trim()}
           className="inline-flex h-touch items-center justify-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
         >
@@ -316,7 +262,9 @@ function PrizesSection({
                   <span
                     className={`text-xs ${drawn ? 'text-ink-secondary' : 'italic text-ink-tertiary'}`}
                   >
-                    {drawn ? p.winnerName : sr.side.lottery.pending}
+                    {drawn
+                      ? `${sr.side.lottery.admin.winningNumber}: ${p.winnerName}`
+                      : sr.side.lottery.pending}
                   </span>
                 </div>
                 {drawn ? (

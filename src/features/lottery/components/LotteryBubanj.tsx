@@ -1,72 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 
-import type { LotteryParticipant } from '@/lib/firestore/types';
 import { useUIStore } from '@/stores/useUIStore';
 
 interface Props {
-  participants: LotteryParticipant[];
+  /** Total raffle slip count (pool is 1..count). */
+  count: number;
   /** True while a name-shuffle is actively running on a prize row. */
   spinningFast?: boolean;
-  /** Set when a prize just resolved to a winner; triggers the ball-fly-out + confetti. */
-  lastWinnerName?: string | null;
+  /** Set when a prize just resolved to a winner — triggers the fly-out + confetti. */
+  lastWinnerNumber?: number | null;
 }
 
 /**
- * The lottery drum as theatre. Three layers:
+ * Numbered lottery drum. Visual-only — the authoritative draw happens
+ * server-side via drawLotteryWinner(). Renders up to MAX_VISIBLE balls
+ * orbiting inside the drum; pool sizes above that show a subset so the
+ * scene stays readable, but the center label always shows the true total.
  *
- *   1. A gold-rimmed navy drum body with a viewing window cut in the
- *      center. The drum rotates permanently on a slow orbit and speeds
- *      up during active draws; a subtle wobble keeps it from looking
- *      mechanical.
- *
- *   2. Participant "balls" (colored chips with the name on them) that
- *      tumble inside the drum on independent orbits at varying radii,
- *      giving a believable volumetric feel even though it's flat SVG.
- *      Each ball has a wobble of its own that desynchronizes from the
- *      drum's rotation — so the view never looks like a static ring.
- *
- *   3. A particle layer of sparks + gold flecks that floats around the
- *      drum and accelerates during draws.
- *
- * When `lastWinnerName` changes, one ball breaks orbit, flies down to a
- * winner pedestal below the drum, and triggers a GSAP confetti burst.
+ * When `lastWinnerNumber` changes the matching ball (or the nearest
+ * visible proxy) breaks orbit, flies to a pedestal below the drum, and
+ * triggers a confetti burst.
  */
+const MAX_VISIBLE = 36;
+
 export function LotteryBubanj({
-  participants,
+  count,
   spinningFast = false,
-  lastWinnerName = null,
+  lastWinnerNumber = null,
 }: Props) {
   const drumRef = useRef<HTMLDivElement | null>(null);
   const wobbleRef = useRef<HTMLDivElement | null>(null);
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
-  const ballRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const ballRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const winnerPedestalRef = useRef<HTMLDivElement | null>(null);
   const confettiLayerRef = useRef<HTMLDivElement | null>(null);
   const spinTweenRef = useRef<gsap.core.Tween | null>(null);
   const wobbleTweenRef = useRef<gsap.core.Tween | null>(null);
   const reducedMotion = useUIStore((s) => s.reducedMotion);
 
-  const [lockedWinner, setLockedWinner] = useState<string | null>(null);
+  const [lockedWinner, setLockedWinner] = useState<number | null>(null);
 
-  // --- Deterministic per-ball seed -----------------------------------------
-  // Each ball needs its own orbit radius, phase, color, and wobble rate so
-  // the scene doesn't feel lattice-y. Deriving those from the participant id
-  // via a small hash keeps them stable across re-renders (no jump on updates)
-  // and across clients (the same draw looks the same everywhere).
+  // --- Which numbers to actually render as orbit chips ---------------------
+  // If the pool is small (<= MAX_VISIBLE) show everything; otherwise show
+  // a sampled subset at even stride so the scene feels representative
+  // without bogging down the DOM / GSAP.
+  const visibleNumbers = useMemo(() => {
+    if (count <= 0) return [] as number[];
+    if (count <= MAX_VISIBLE) {
+      return Array.from({ length: count }, (_, i) => i + 1);
+    }
+    const stride = count / MAX_VISIBLE;
+    return Array.from({ length: MAX_VISIBLE }, (_, i) =>
+      Math.min(count, Math.max(1, Math.round((i + 0.5) * stride))),
+    );
+  }, [count]);
+
+  // Seeds per visible number for orbit radius, phase, color.
   const orbits = useMemo(
     () =>
-      participants.map((p) => {
-        const seed = hashString(p.id);
+      visibleNumbers.map((n, i) => {
+        const seed = hashNumber(n);
         const radiusRem = 4 + (seed % 500) / 100; // 4rem – 9rem
-        const baseAngle = seed % 360;
-        const phaseSec = (seed % 700) / 100; // 0 – 7 s stagger
-        const orbitSec = 8 + (seed % 900) / 100; // 8 – 17 s per revolution
-        const wobbleSec = 2 + (seed % 300) / 100; // 2 – 5 s
-        const hue = 28 + (seed % 60); // gold -> amber band
-        return { p, radiusRem, baseAngle, phaseSec, orbitSec, wobbleSec, hue };
+        const baseAngle = (360 / visibleNumbers.length) * i + (seed % 20);
+        const phaseSec = (seed % 700) / 100;
+        const orbitSec = 8 + (seed % 900) / 100;
+        const wobbleSec = 2 + (seed % 300) / 100;
+        const hue = 28 + (seed % 60);
+        return { n, radiusRem, baseAngle, phaseSec, orbitSec, wobbleSec, hue };
       }),
-    [participants],
+    [visibleNumbers],
   );
 
   // --- Drum rotation + wobble ----------------------------------------------
@@ -94,31 +97,27 @@ export function LotteryBubanj({
         repeat: -1,
       });
     }
-
     return () => {
       spinTweenRef.current?.kill();
       wobbleTweenRef.current?.kill();
     };
   }, [reducedMotion]);
 
-  // Retune the spin duration on draw — no teardown, just faster/slower.
+  // Retune tempo on draw.
   useEffect(() => {
     const t = spinTweenRef.current;
-    if (!t) return;
-    t.duration(spinningFast ? 2.2 : 18);
-    // Wobble intensifies a bit during draws for extra chaos.
+    if (t) t.duration(spinningFast ? 2.2 : 18);
     const w = wobbleTweenRef.current;
     if (w) w.duration(spinningFast ? 1.5 : 3.1);
   }, [spinningFast]);
 
-  // --- Per-ball orbits (independent GSAP tweens on CSS vars) ---------------
+  // --- Per-ball orbits ------------------------------------------------------
   useEffect(() => {
     if (reducedMotion) return;
     const tweens: gsap.core.Tween[] = [];
-    for (const { p, baseAngle, phaseSec, orbitSec, wobbleSec } of orbits) {
-      const el = ballRefs.current.get(p.id);
+    for (const { n, baseAngle, phaseSec, orbitSec, wobbleSec } of orbits) {
+      const el = ballRefs.current.get(n);
       if (!el) continue;
-      // Seed starting angle.
       gsap.set(el, { ['--angle' as string]: `${baseAngle}deg`, ['--wobble' as string]: '0rem' });
       tweens.push(
         gsap.to(el, {
@@ -126,7 +125,7 @@ export function LotteryBubanj({
           duration: orbitSec,
           ease: 'none',
           repeat: -1,
-          delay: -phaseSec, // negative delay = pre-seek
+          delay: -phaseSec,
         }),
       );
       tweens.push(
@@ -142,15 +141,15 @@ export function LotteryBubanj({
     return () => tweens.forEach((t) => t.kill());
   }, [orbits, reducedMotion]);
 
-  // --- Sparks: render N particles with random long-duration drifts ---------
+  // --- Sparks ---------------------------------------------------------------
   useEffect(() => {
     if (reducedMotion) return;
     const layer = particleLayerRef.current;
     if (!layer) return;
     const sparks: HTMLSpanElement[] = [];
     const tweens: gsap.core.Tween[] = [];
-    const count = 24;
-    for (let i = 0; i < count; i++) {
+    const total = 24;
+    for (let i = 0; i < total; i++) {
       const s = document.createElement('span');
       s.className = 'pointer-events-none absolute rounded-full';
       const size = 0.2 + Math.random() * 0.5;
@@ -169,12 +168,10 @@ export function LotteryBubanj({
         x: gsap.utils.random(-280, 280),
         y: gsap.utils.random(-260, 260),
       });
-      const driftX = gsap.utils.random(-320, 320);
-      const driftY = gsap.utils.random(-300, 300);
       tweens.push(
         gsap.to(s, {
-          x: driftX,
-          y: driftY,
+          x: gsap.utils.random(-320, 320),
+          y: gsap.utils.random(-300, 300),
           duration: 6 + Math.random() * 6,
           ease: 'sine.inOut',
           yoyo: true,
@@ -199,12 +196,26 @@ export function LotteryBubanj({
 
   // --- Fly-out + confetti on winner change ---------------------------------
   useEffect(() => {
-    if (!lastWinnerName || lastWinnerName === lockedWinner) return;
-    setLockedWinner(lastWinnerName);
+    if (lastWinnerNumber == null || lastWinnerNumber === lockedWinner) return;
+    setLockedWinner(lastWinnerNumber);
     if (reducedMotion) return;
 
-    const matched = participants.find((p) => p.name === lastWinnerName);
-    const ball = matched ? ballRefs.current.get(matched.id) : null;
+    // Find the orbiting ball whose label matches; if the winning number
+    // isn't in the sampled subset, grab the visually closest one.
+    let ballKey: number | null = null;
+    if (ballRefs.current.has(lastWinnerNumber)) {
+      ballKey = lastWinnerNumber;
+    } else {
+      let best = Infinity;
+      for (const n of ballRefs.current.keys()) {
+        const d = Math.abs(n - lastWinnerNumber);
+        if (d < best) {
+          best = d;
+          ballKey = n;
+        }
+      }
+    }
+    const ball = ballKey !== null ? ballRefs.current.get(ballKey) : null;
     const pedestal = winnerPedestalRef.current;
     const confettiLayer = confettiLayerRef.current;
 
@@ -241,7 +252,6 @@ export function LotteryBubanj({
       );
     }
 
-    // Confetti burst.
     if (confettiLayer) {
       const pieces = 48;
       for (let i = 0; i < pieces; i++) {
@@ -259,7 +269,7 @@ export function LotteryBubanj({
         const dist = 140 + Math.random() * 260;
         gsap.to(p, {
           x: Math.cos(angle) * dist,
-          y: Math.sin(angle) * dist + 60, // gravity-ish downward bias
+          y: Math.sin(angle) * dist + 60,
           rotation: Math.random() * 720 - 360,
           opacity: 0,
           duration: 1.2 + Math.random() * 0.8,
@@ -268,19 +278,18 @@ export function LotteryBubanj({
         });
       }
     }
-  }, [lastWinnerName, lockedWinner, participants, reducedMotion]);
+  }, [lastWinnerNumber, lockedWinner, reducedMotion]);
 
-  if (participants.length === 0) {
+  if (count <= 0) {
     return (
       <div className="flex h-72 items-center justify-center rounded-full border-2 border-dashed border-surface-4 text-sm italic text-ink-tertiary">
-        Čeka se lista učesnika…
+        Čeka se broj učesnika…
       </div>
     );
   }
 
   return (
     <div className="relative flex flex-col items-center gap-6">
-      {/* Scene */}
       <div
         className="relative flex items-center justify-center"
         style={{ width: '32rem', maxWidth: '100%', height: '32rem' }}
@@ -295,16 +304,13 @@ export function LotteryBubanj({
           }}
         />
 
-        {/* Sparks */}
         <div
           ref={particleLayerRef}
           className="pointer-events-none absolute inset-0 overflow-hidden"
           style={{ willChange: 'transform' }}
         />
 
-        {/* Wobble wrapper — parent of drum + balls */}
         <div ref={wobbleRef} className="relative h-full w-full">
-          {/* Drum body */}
           <div
             ref={drumRef}
             className="absolute inset-8 rounded-full"
@@ -317,7 +323,6 @@ export function LotteryBubanj({
               willChange: 'transform',
             }}
           >
-            {/* Drum texture: radial stripes evoking a rotating barrel */}
             <div
               className="absolute inset-0 rounded-full opacity-40"
               style={{
@@ -325,7 +330,6 @@ export function LotteryBubanj({
                   'conic-gradient(from 0deg, rgba(255,255,255,0.12), transparent 10%, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%, transparent 90%, rgba(255,255,255,0.12))',
               }}
             />
-            {/* Central viewing window */}
             <div
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
               style={{
@@ -338,15 +342,14 @@ export function LotteryBubanj({
             />
           </div>
 
-          {/* Balls — positioned absolutely, each with its own orbit via CSS vars */}
-          {orbits.map(({ p, hue }) => (
+          {orbits.map(({ n, hue }) => (
             <div
-              key={p.id}
+              key={n}
               ref={(el) => {
-                if (el) ballRefs.current.set(p.id, el);
-                else ballRefs.current.delete(p.id);
+                if (el) ballRefs.current.set(n, el);
+                else ballRefs.current.delete(n);
               }}
-              className="absolute left-1/2 top-1/2 flex items-center justify-center rounded-full text-[0.6rem] font-700 tracking-tight"
+              className="absolute left-1/2 top-1/2 flex items-center justify-center rounded-full font-display text-sm font-700 tabular-nums"
               style={
                 {
                   '--angle': '0deg',
@@ -359,43 +362,37 @@ export function LotteryBubanj({
                   boxShadow:
                     '0 0 0 1px rgba(0,0,0,0.4), 0 0.4rem 0.6rem rgba(0,0,0,0.45), inset -0.15rem -0.2rem 0.3rem rgba(0,0,0,0.4), inset 0.15rem 0.2rem 0.25rem rgba(255,255,255,0.45)',
                   color: '#211105',
-                  // Orbit positioning via rotate/translate/rotate trick so
-                  // the label stays upright while the drum spins.
                   transform:
                     'translate(calc(cos(var(--angle)) * 9rem + var(--wobble)), calc(sin(var(--angle)) * 9rem)) rotate(calc(var(--angle) * -1))',
                   willChange: 'transform',
                 } as React.CSSProperties
               }
-              title={p.name}
+              title={`Broj ${n}`}
             >
-              <span className="max-w-[2rem] truncate px-1 text-center">{p.name}</span>
+              {n}
             </div>
           ))}
         </div>
 
-        {/* Center label */}
         <div className="pointer-events-none absolute flex flex-col items-center gap-1 text-center">
           <span className="font-display text-[0.65rem] uppercase tracking-[0.4em] text-accent-gold">
             bubanj
           </span>
           <span className="tnum font-display text-4xl font-700 text-ink-primary drop-shadow-[0_0_0.5rem_rgba(244,197,66,0.4)]">
-            {participants.length}
+            {count}
           </span>
           <span className="text-[0.65rem] uppercase tracking-[0.25em] text-ink-tertiary">
-            učesnika
+            listića
           </span>
         </div>
 
-        {/* Confetti layer — covers whole scene */}
         <div
           ref={confettiLayerRef}
           className="pointer-events-none absolute inset-0 overflow-visible"
         />
       </div>
 
-      {/* Winner pedestal — where a ball flies to when drawn. Reveals only
-          after the first draw (keeps the layout balanced before). */}
-      {lockedWinner ? (
+      {lockedWinner !== null ? (
         <div
           ref={winnerPedestalRef}
           className="flex flex-col items-center gap-1 rounded-2xl px-6 py-4 shadow-elevated"
@@ -406,18 +403,19 @@ export function LotteryBubanj({
           }}
         >
           <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-80">
-            poslednji pobednik
+            poslednji dobitni broj
           </span>
-          <span className="font-display text-2xl font-700">{lockedWinner}</span>
+          <span className="tnum font-display text-4xl font-700">{lockedWinner}</span>
         </div>
       ) : null}
     </div>
   );
 }
 
-// Small deterministic hash used for per-ball seeding. djb2.
-function hashString(s: string): number {
+function hashNumber(n: number): number {
+  // djb2-ish for a small integer; good enough to decorrelate seeds.
   let h = 5381;
+  const s = String(n);
   for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
   return Math.abs(h);
 }

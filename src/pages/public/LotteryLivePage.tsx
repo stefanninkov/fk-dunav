@@ -2,16 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { onSnapshot, orderBy, query } from 'firebase/firestore';
 
-import {
-  lotteryCol,
-  lotteryParticipantsCol,
-  lotterySessionDoc,
-} from '@/lib/firestore/refs';
-import type {
-  LotteryParticipant,
-  LotteryPrize,
-  LotterySession,
-} from '@/lib/firestore/types';
+import { lotteryCol, lotterySessionDoc } from '@/lib/firestore/refs';
+import type { LotteryPrize, LotterySession } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -19,22 +11,17 @@ import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
 import { LotteryBubanj } from '@/features/lottery/components/LotteryBubanj';
 
 /**
- * Public Lutrija page. Runs under the normal site layout (header + footer)
- * so it shows up as a regular tab; also renders well in fullscreen on a
- * projector for the live draw.
- *
- * Reveals the bubanj once admin flips `lotterySession.current.drumVisible`.
- * Watches for new winners on each prize and runs the shuffle-to-settle
- * animation on the corresponding row + passes the winner name down to the
- * bubanj to trigger the fly-out + confetti.
+ * Public Lutrija page. The draw pool is simply integers 1..participantCount
+ * (from the session doc); prize winnerName stores the drawn number as a
+ * string. Shuffle-to-settle animation cycles random integers in that range
+ * then lands on the real winning number, and the bubanj fires its fly-out.
  */
 export function LotteryLivePage() {
   const active = useTournamentStore((s) => s.active);
   const [prizes, setPrizes] = useState<LotteryPrize[]>([]);
-  const [participants, setParticipants] = useState<LotteryParticipant[]>([]);
   const [session, setSession] = useState<LotterySession | null>(null);
   const [shufflingPrizeId, setShufflingPrizeId] = useState<string | null>(null);
-  const [lastWinnerName, setLastWinnerName] = useState<string | null>(null);
+  const [lastWinnerNumber, setLastWinnerNumber] = useState<number | null>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -42,21 +29,17 @@ export function LotteryLivePage() {
       query(lotteryCol(active.id), orderBy('order', 'asc')),
       (snap) => setPrizes(snap.docs.map((d) => d.data())),
     );
-    const unsubParticipants = onSnapshot(
-      lotteryParticipantsCol(active.id),
-      (snap) => setParticipants(snap.docs.map((d) => d.data())),
-    );
     const unsubSession = onSnapshot(lotterySessionDoc(active.id), (snap) =>
       setSession(snap.exists() ? snap.data() : null),
     );
     return () => {
       unsubPrizes();
-      unsubParticipants();
       unsubSession();
     };
   }, [active]);
 
   const drumVisible = session?.drumVisible ?? false;
+  const participantCount = session?.participantCount ?? 0;
   const drawnCount = prizes.filter((p) => !!p.winnerName).length;
 
   if (!active) {
@@ -65,7 +48,6 @@ export function LotteryLivePage() {
 
   return (
     <section className="relative overflow-hidden">
-      {/* Background glow when drum is live */}
       {drumVisible ? (
         <div
           aria-hidden="true"
@@ -90,15 +72,13 @@ export function LotteryLivePage() {
 
         {drumVisible ? (
           <LotteryBubanj
-            participants={participants}
+            count={participantCount}
             spinningFast={!!shufflingPrizeId}
-            lastWinnerName={lastWinnerName}
+            lastWinnerNumber={lastWinnerNumber}
           />
         ) : (
           <div className="w-full rounded-xl bg-surface-1 px-6 py-10 text-center shadow-card">
-            <p className="text-base text-ink-secondary">
-              Izvlačenje još nije počelo.
-            </p>
+            <p className="text-base text-ink-secondary">Izvlačenje još nije počelo.</p>
             <p className="mt-1 text-xs text-ink-tertiary">
               Bubanj će se pojaviti kada admin otvori sesiju.
             </p>
@@ -117,11 +97,11 @@ export function LotteryLivePage() {
                   key={p.id}
                   prize={p}
                   index={idx}
-                  participants={participants}
+                  participantCount={participantCount}
                   onShuffleStart={() => setShufflingPrizeId(p.id)}
-                  onShuffleEnd={(winner) => {
+                  onShuffleEnd={(winnerNum) => {
                     setShufflingPrizeId((curr) => (curr === p.id ? null : curr));
-                    setLastWinnerName(winner);
+                    setLastWinnerNumber(winnerNum);
                   }}
                 />
               ))}
@@ -147,37 +127,43 @@ const SHUFFLE_STEP_MS = 70;
 function PrizeRow({
   prize,
   index,
-  participants,
+  participantCount,
   onShuffleStart,
   onShuffleEnd,
 }: {
   prize: LotteryPrize;
   index: number;
-  participants: LotteryParticipant[];
+  participantCount: number;
   onShuffleStart: () => void;
-  onShuffleEnd: (winnerName: string) => void;
+  onShuffleEnd: (winnerNumber: number) => void;
 }) {
   const rowRef = useRef<HTMLLIElement | null>(null);
   const badgeRef = useRef<HTMLSpanElement | null>(null);
   const hadWinnerRef = useRef<boolean>(!!prize.winnerName);
   const reducedMotion = useUIStore((s) => s.reducedMotion);
 
-  // Parent callbacks identity changes every render — keep them in refs so
-  // the effect below doesn't tear down + re-run mid-shuffle (which was
-  // cancelling the animation before anything visible started).
+  // Refs so the effect re-runs ONLY when the winner actually changes — not
+  // whenever the parent recreates its callbacks. Without this, the effect
+  // was tearing down mid-shuffle and the animation never fired.
   const onShuffleStartRef = useRef(onShuffleStart);
   const onShuffleEndRef = useRef(onShuffleEnd);
   onShuffleStartRef.current = onShuffleStart;
   onShuffleEndRef.current = onShuffleEnd;
 
-  const [displayName, setDisplayName] = useState<string | null>(prize.winnerName ?? null);
+  const [displayLabel, setDisplayLabel] = useState<string | null>(
+    prize.winnerName ?? null,
+  );
   const [phase, setPhase] = useState<'idle' | 'shuffling' | 'settled'>(
     prize.winnerName ? 'settled' : 'idle',
   );
 
-  const pool = useMemo(() => participants.map((p) => p.name), [participants]);
-  const poolRef = useRef(pool);
-  poolRef.current = pool;
+  const countRef = useRef(participantCount);
+  countRef.current = participantCount;
+
+  const winnerNumber = useMemo(() => {
+    const n = Number(prize.winnerName);
+    return Number.isInteger(n) ? n : null;
+  }, [prize.winnerName]);
 
   useEffect(() => {
     const currentWinner = prize.winnerName;
@@ -185,21 +171,21 @@ function PrizeRow({
     hadWinnerRef.current = !!currentWinner;
 
     if (!currentWinner) {
-      setDisplayName(null);
+      setDisplayLabel(null);
       setPhase('idle');
       return;
     }
 
     if (hadWinner) {
-      setDisplayName(currentWinner);
+      setDisplayLabel(currentWinner);
       setPhase('settled');
       return;
     }
 
-    if (reducedMotion || poolRef.current.length === 0) {
-      setDisplayName(currentWinner);
+    if (reducedMotion || countRef.current <= 0) {
+      setDisplayLabel(currentWinner);
       setPhase('settled');
-      onShuffleEndRef.current(currentWinner);
+      if (winnerNumber !== null) onShuffleEndRef.current(winnerNumber);
       return;
     }
 
@@ -211,9 +197,9 @@ function PrizeRow({
       if (cancelled) return;
       const elapsed = Date.now() - startedAt;
       if (elapsed >= SHUFFLE_DURATION_MS) {
-        setDisplayName(currentWinner);
+        setDisplayLabel(currentWinner);
         setPhase('settled');
-        onShuffleEndRef.current(currentWinner);
+        if (winnerNumber !== null) onShuffleEndRef.current(winnerNumber);
         const row = rowRef.current;
         const badge = badgeRef.current;
         if (row) {
@@ -242,10 +228,10 @@ function PrizeRow({
         }
         return;
       }
-      const curr = poolRef.current;
-      if (curr.length > 0) {
-        const pick = curr[Math.floor(Math.random() * curr.length)];
-        setDisplayName(pick);
+      const count = countRef.current;
+      if (count > 0) {
+        const pick = Math.floor(Math.random() * count) + 1;
+        setDisplayLabel(String(pick));
       }
       window.setTimeout(tick, SHUFFLE_STEP_MS);
     };
@@ -254,7 +240,7 @@ function PrizeRow({
     return () => {
       cancelled = true;
     };
-  }, [prize.winnerName, reducedMotion]);
+  }, [prize.winnerName, reducedMotion, winnerNumber]);
 
   const drawn = phase === 'settled';
 
@@ -289,15 +275,15 @@ function PrizeRow({
       <div className="flex flex-1 flex-col">
         <span className="font-display text-xl font-500 text-ink-primary">{prize.label}</span>
         <span
-          className={`mt-1 font-display text-lg ${
+          className={`mt-1 font-display text-2xl tnum ${
             phase === 'shuffling'
               ? 'font-700 text-accent-gold'
               : drawn
-                ? 'font-600 text-ink-primary'
+                ? 'font-700 text-ink-primary'
                 : 'italic text-ink-tertiary'
           }`}
         >
-          {displayName ?? sr.side.lottery.pending}
+          {displayLabel ?? sr.side.lottery.pending}
         </span>
       </div>
     </li>
