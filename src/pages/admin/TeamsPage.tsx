@@ -8,13 +8,13 @@ import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { GroupsPanel } from '@/features/team/components/GroupsPanel';
 import { TeamList } from '@/features/team/components/TeamList';
-import { TeamForm } from '@/features/team/components/TeamForm';
+import { TeamEditor } from '@/features/team/components/TeamEditor';
 
 export function TeamsPage() {
   const active = useTournamentStore((s) => s.active);
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [teams, setTeams] = useState<Team[] | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Team | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export function TeamsPage() {
         <h1 className="font-display text-2xl font-700">{sr.admin.teams.title}</h1>
         <button
           type="button"
-          onClick={() => setFormOpen(true)}
+          onClick={() => setEditing('new')}
           disabled={!groups || groups.length === 0}
           className="inline-flex h-touch items-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
           title={groups && groups.length === 0 ? 'Prvo dodaj grupu' : undefined}
@@ -75,14 +75,20 @@ export function TeamsPage() {
       {teams === null ? (
         <p className="text-sm text-ink-secondary">{sr.common.loading}</p>
       ) : (
-        <TeamList teams={teams} groups={groups ?? []} tournamentId={active.id} />
+        <TeamList
+          teams={teams}
+          groups={groups ?? []}
+          tournamentId={active.id}
+          onEdit={(team) => setEditing(team)}
+        />
       )}
 
-      {formOpen && groups && groups.length > 0 ? (
-        <TeamForm
+      {editing && groups && groups.length > 0 ? (
+        <TeamEditor
           tournamentId={active.id}
           groups={groups}
-          onClose={() => setFormOpen(false)}
+          team={editing === 'new' ? undefined : editing}
+          onClose={() => setEditing(null)}
         />
       ) : null}
     </section>

@@ -34,7 +34,6 @@ const navItems = [
   { to: '/admin', label: sr.admin.nav.dashboard, icon: LayoutDashboard, end: true },
   { to: '/admin/utakmice', label: sr.admin.nav.matches, icon: ListOrdered },
   { to: '/admin/timovi', label: sr.admin.nav.teams, icon: Users },
-  { to: '/admin/igraci', label: sr.admin.nav.players, icon: Users },
   { to: '/admin/raspored', label: sr.admin.nav.schedule, icon: CalendarDays },
   { to: '/admin/bracket', label: sr.admin.nav.bracket, icon: Trophy },
   { to: '/admin/galerija', label: sr.admin.nav.gallery, icon: ImageIcon },

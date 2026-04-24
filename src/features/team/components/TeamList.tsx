@@ -1,16 +1,19 @@
 import { useState } from 'react';
+import { Pencil } from 'lucide-react';
 
 import type { Group, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { softDeleteTeam } from '@/features/team/teamActions';
+import { deleteTeamRoster } from '@/features/player/playerActions';
 
 interface Props {
   tournamentId: string;
   teams: Team[];
   groups: Group[];
+  onEdit: (team: Team) => void;
 }
 
-export function TeamList({ tournamentId, teams, groups }: Props) {
+export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
   if (teams.length === 0) {
     return (
       <p className="rounded-md bg-surface-1 px-4 py-6 text-center text-sm text-ink-secondary">
@@ -40,7 +43,12 @@ export function TeamList({ tournamentId, teams, groups }: Props) {
             ) : (
               <ul className="flex flex-col gap-2">
                 {list.map((team) => (
-                  <TeamRow key={team.id} team={team} tournamentId={tournamentId} />
+                  <TeamRow
+                    key={team.id}
+                    team={team}
+                    tournamentId={tournamentId}
+                    onEdit={() => onEdit(team)}
+                  />
                 ))}
               </ul>
             )}
@@ -51,13 +59,22 @@ export function TeamList({ tournamentId, teams, groups }: Props) {
   );
 }
 
-function TeamRow({ tournamentId, team }: { tournamentId: string; team: Team }) {
+function TeamRow({
+  tournamentId,
+  team,
+  onEdit,
+}: {
+  tournamentId: string;
+  team: Team;
+  onEdit: () => void;
+}) {
   const [busy, setBusy] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(`Obrisati tim "${team.name}"?`)) return;
+    if (!confirm(`Obrisati tim "${team.name}" i sve igrače?`)) return;
     setBusy(true);
     try {
+      await deleteTeamRoster(tournamentId, team.id);
       await softDeleteTeam(tournamentId, team.id);
     } finally {
       setBusy(false);
@@ -82,14 +99,24 @@ function TeamRow({ tournamentId, team }: { tournamentId: string; team: Team }) {
           ) : null}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={busy}
-        className="rounded-md border border-surface-4 px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-2 disabled:opacity-60"
-      >
-        {sr.common.delete}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-1 rounded-md border border-surface-4 px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-2 hover:text-ink-primary"
+        >
+          <Pencil size={14} />
+          {sr.common.edit}
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={busy}
+          className="rounded-md border border-surface-4 px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-2 disabled:opacity-60"
+        >
+          {sr.common.delete}
+        </button>
+      </div>
     </li>
   );
 }

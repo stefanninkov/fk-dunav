@@ -55,9 +55,6 @@ const TournamentPage = lazy(() =>
 const AdminTeamsPage = lazy(() =>
   import('@/pages/admin/TeamsPage').then((m) => ({ default: m.TeamsPage })),
 );
-const AdminPlayersPage = lazy(() =>
-  import('@/pages/admin/PlayersPage').then((m) => ({ default: m.PlayersPage })),
-);
 const AdminSchedulePage = lazy(() =>
   import('@/pages/admin/SchedulePage').then((m) => ({ default: m.SchedulePage })),
 );
@@ -169,7 +166,6 @@ export const router = createBrowserRouter(
             { index: true, element: lazyRoute(<AdminHomePage />) },
             { path: 'turnir', element: lazyRoute(<TournamentPage />) },
             { path: 'timovi', element: lazyRoute(<AdminTeamsPage />) },
-            { path: 'igraci', element: lazyRoute(<AdminPlayersPage />) },
             { path: 'raspored', element: lazyRoute(<AdminSchedulePage />) },
             { path: 'utakmice', element: lazyRoute(<AdminMatchesPage />) },
             { path: 'utakmice/:matchId', element: lazyRoute(<AdminMatchEditorPage />) },

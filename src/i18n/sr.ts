@@ -132,12 +132,18 @@ export const sr = {
       title: 'Timovi',
       newButton: 'Dodaj tim',
       empty: 'Još nema timova. Dodaj prvi.',
+      rosterTitle: 'Igrači',
+      addPlayer: 'Dodaj igrača',
+      rosterEmpty: 'Još nema igrača u ekipi.',
       form: {
         name: 'Naziv tima',
         shortName: 'Skraćenica (za nokaut)',
         group: 'Grupa',
         color: 'Boja (hex, opciono)',
         captainName: 'Kapiten',
+        firstName: 'Ime',
+        lastName: 'Prezime',
+        photoUrl: 'URL fotografije (opciono)',
       },
     },
 
