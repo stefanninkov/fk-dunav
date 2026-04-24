@@ -23,7 +23,12 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
   }
 
   const byGroup = new Map<string, Team[]>();
+  const unassigned: Team[] = [];
   for (const t of teams) {
+    if (!t.groupId) {
+      unassigned.push(t);
+      continue;
+    }
     const list = byGroup.get(t.groupId) ?? [];
     list.push(t);
     byGroup.set(t.groupId, list);
@@ -31,6 +36,24 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {unassigned.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h3 className="font-display text-sm font-600 text-ink-secondary">
+            {sr.admin.teams.form.unassigned}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {unassigned.map((team) => (
+              <TeamRow
+                key={team.id}
+                team={team}
+                tournamentId={tournamentId}
+                onEdit={() => onEdit(team)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {groups.map((g) => {
         const list = byGroup.get(g.id) ?? [];
         return (

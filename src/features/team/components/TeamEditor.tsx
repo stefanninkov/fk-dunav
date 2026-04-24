@@ -28,7 +28,10 @@ const schema = z.object({
     .max(5, 'Najviše 5 karaktera')
     .optional()
     .transform((v) => (v ? v.trim() : undefined)),
-  groupId: z.string().min(1, sr.common.required),
+  // Empty string = team not yet drawn into a group (filled by the
+  // group-draw bubanj). Stored as '' on the doc; UI shows a "Bez grupe
+  // (izvlačenje)" option as the first select item.
+  groupId: z.string().default(''),
   color: z
     .string()
     .regex(/^#?[0-9a-fA-F]{6}$/, 'Hex boja, npr. #01458E')
@@ -64,7 +67,7 @@ export function TeamEditor({ tournamentId, groups, team, onClose }: Props) {
     defaultValues: {
       name: team?.name ?? '',
       shortName: team?.shortName ?? '',
-      groupId: team?.groupId ?? groups[0]?.id ?? '',
+      groupId: team?.groupId ?? '',
       color: team?.color ?? '',
       captainName: team?.captainName ?? '',
       roster: [],
@@ -202,6 +205,7 @@ export function TeamEditor({ tournamentId, groups, team, onClose }: Props) {
               {sr.admin.teams.form.group}
             </span>
             <select className={inputClass} {...register('groupId')}>
+              <option value="">— {sr.admin.teams.form.unassigned} —</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}

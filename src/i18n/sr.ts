@@ -135,6 +135,17 @@ export const sr = {
       rosterTitle: 'Igrači',
       addPlayer: 'Dodaj igrača',
       rosterEmpty: 'Još nema igrača u ekipi.',
+      drawTitle: 'Izvlačenje grupa',
+      drawHelp:
+        'Dodaj timove bez grupe i napravi željene grupe. Bubanj onda nasumično raspoređuje timove u grupe po seed redosledu.',
+      drawShowDrum: 'Pokaži bubanj na /grupe',
+      drawHideDrum: 'Sakrij bubanj',
+      drawNext: 'Izvuci sledeći tim',
+      drawReset: 'Poništi celo izvlačenje',
+      drawResetConfirm: 'Ovo će isprazniti sve grupe. Nastaviti?',
+      drawNoGroups: 'Prvo napravi barem jednu grupu.',
+      drawAllAssigned: 'Svi timovi su raspoređeni.',
+      drawUnassignedTitle: 'Čekaju izvlačenje',
       form: {
         name: 'Naziv tima',
         shortName: 'Skraćenica (za nokaut)',
@@ -144,6 +155,7 @@ export const sr = {
         firstName: 'Ime',
         lastName: 'Prezime',
         photoUrl: 'URL fotografije (opciono)',
+        unassigned: 'Bez grupe (izvlačenje)',
       },
     },
 

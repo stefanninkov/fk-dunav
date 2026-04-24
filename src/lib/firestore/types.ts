@@ -83,6 +83,7 @@ export interface Team {
   name: string;
   shortName?: string;
   logoUrl?: string;
+  /** Empty string means "not yet drawn into a group". */
   groupId: string;
   color?: string;
   captainName?: string;
@@ -389,6 +390,24 @@ export interface LotterySession {
   drumVisible: boolean;
   /** Total slips sold — the pool is 1..participantCount. */
   participantCount: number;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+/**
+ * Single-doc session state for the group draw. Admin flips `drumVisible`
+ * to reveal the drum on the public /grupe page; each draw writes the
+ * newly-assigned team + group id so the public view can animate the ball
+ * flying into the right group column.
+ */
+export interface GroupDrawSession {
+  id: string;
+  drumVisible: boolean;
+  lastDrawnTeamId?: string;
+  lastDrawnTeamName?: string;
+  lastDrawnGroupId?: string;
+  lastDrawnGroupName?: string;
+  lastDrawnAt?: Timestamp;
   updatedAt: Timestamp;
   updatedBy: string;
 }

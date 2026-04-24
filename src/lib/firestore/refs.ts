@@ -17,6 +17,7 @@ import {
   fanPollConverter,
   inviteConverter,
   groupConverter,
+  groupDrawSessionConverter,
   kupSankaConverter,
   lotteryParticipantConverter,
   lotteryPrizeConverter,
@@ -43,6 +44,7 @@ import type {
   FanPollId,
   Invite,
   Group,
+  GroupDrawSession,
   KupSankaEntry,
   LotteryParticipant,
   LotteryPrize,
@@ -110,6 +112,13 @@ export const groupsCol = (tournamentId: string): CollectionReference<Group> =>
 
 export const groupDoc = (tournamentId: string, groupId: string): DocumentReference<Group> =>
   doc(db, 'tournaments', tournamentId, 'groups', groupId).withConverter(groupConverter);
+
+export const groupDrawSessionDoc = (
+  tournamentId: string,
+): DocumentReference<GroupDrawSession> =>
+  doc(db, 'tournaments', tournamentId, 'groupDrawSession', 'current').withConverter(
+    groupDrawSessionConverter,
+  );
 
 export const teamsCol = (tournamentId: string): CollectionReference<Team> =>
   collection(db, 'tournaments', tournamentId, 'teams').withConverter(teamConverter);

@@ -9,6 +9,7 @@ import { useTournamentStore } from '@/stores/useTournamentStore';
 import { GroupsPanel } from '@/features/team/components/GroupsPanel';
 import { TeamList } from '@/features/team/components/TeamList';
 import { TeamEditor } from '@/features/team/components/TeamEditor';
+import { GroupDrawPanel } from '@/features/team/components/GroupDrawPanel';
 
 export function TeamsPage() {
   const active = useTournamentStore((s) => s.active);
@@ -57,9 +58,7 @@ export function TeamsPage() {
         <button
           type="button"
           onClick={() => setEditing('new')}
-          disabled={!groups || groups.length === 0}
           className="inline-flex h-touch items-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
-          title={groups && groups.length === 0 ? 'Prvo dodaj grupu' : undefined}
         >
           <Plus size={18} />
           {sr.admin.teams.newButton}
@@ -83,10 +82,18 @@ export function TeamsPage() {
         />
       )}
 
-      {editing && groups && groups.length > 0 ? (
+      {teams !== null ? (
+        <GroupDrawPanel
+          tournamentId={active.id}
+          groups={groups ?? []}
+          teams={teams}
+        />
+      ) : null}
+
+      {editing ? (
         <TeamEditor
           tournamentId={active.id}
-          groups={groups}
+          groups={groups ?? []}
           team={editing === 'new' ? undefined : editing}
           onClose={() => setEditing(null)}
         />

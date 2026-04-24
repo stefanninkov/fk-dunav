@@ -113,6 +113,11 @@ service cloud.firestore {
         allow write: if hasCap('teams');
       }
 
+      match /groupDrawSession/{sid} {
+        allow read: if true;
+        allow write: if hasCap('teams');
+      }
+
       match /teams/{teamId} {
         allow read: if true;
         allow write: if hasCap('teams');

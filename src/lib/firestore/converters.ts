@@ -18,6 +18,7 @@ import type {
   Invite,
   Photo,
   Group,
+  GroupDrawSession,
   KupSankaEntry,
   LotteryParticipant,
   LotteryPrize,
@@ -55,6 +56,7 @@ function makeConverter<T>(): FirestoreDataConverter<T> {
 
 export const tournamentConverter  = makeConverter<Tournament>();
 export const groupConverter       = makeConverter<Group>();
+export const groupDrawSessionConverter = makeConverter<GroupDrawSession>();
 export const teamConverter        = makeConverter<Team>();
 export const playerConverter      = makeConverter<Player>();
 export const matchConverter       = makeConverter<Match>();
