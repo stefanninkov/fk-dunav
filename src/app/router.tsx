@@ -106,6 +106,9 @@ const AdminChampionsPage = lazy(() =>
 const AdminLotteryPage = lazy(() =>
   import('@/pages/admin/LotteryPage').then((m) => ({ default: m.LotteryPage })),
 );
+const AdminHelpPage = lazy(() =>
+  import('@/pages/admin/HelpPage').then((m) => ({ default: m.HelpPage })),
+);
 
 function AdminFallback() {
   return <PagePlaceholder title={sr.admin.nav.dashboard} description={sr.common.loading} />;
@@ -195,6 +198,7 @@ export const router = createBrowserRouter(
             { path: 'glasanje', element: capRoute(<AdminVotingPage />, 'content') },
             { path: 'sampioni', element: capRoute(<AdminChampionsPage />) },
             { path: 'lutrija', element: capRoute(<AdminLotteryPage />, 'side_events') },
+            { path: 'pomoc', element: lazyRoute(<AdminHelpPage />) },
             { path: '*', element: <Navigate to="/admin" replace /> },
           ],
         },

@@ -7,6 +7,7 @@ import {
   Beer,
   CalendarDays,
   FileText,
+  HelpCircle,
   History,
   Image as ImageIcon,
   LayoutDashboard,
@@ -47,6 +48,7 @@ interface NavItemDef {
 
 const allNavItems: NavItemDef[] = [
   { to: '/admin', label: sr.admin.nav.dashboard, icon: LayoutDashboard, end: true, always: true },
+  { to: '/admin/pomoc', label: 'Pomoć', icon: HelpCircle, always: true },
   { to: '/admin/utakmice', label: sr.admin.nav.matches, icon: ListOrdered, cap: 'matches' },
   { to: '/admin/raspored', label: sr.admin.nav.schedule, icon: CalendarDays, cap: 'matches' },
   { to: '/admin/bracket', label: sr.admin.nav.bracket, icon: Trophy, cap: 'matches' },
