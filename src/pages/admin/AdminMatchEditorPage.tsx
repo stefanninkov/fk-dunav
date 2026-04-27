@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { Trash2 } from 'lucide-react';
 
 import {
   matchDoc,
   matchEventsCol,
+  playersCol,
 } from '@/lib/firestore/refs';
-import type { Match, MatchEvent } from '@/lib/firestore/types';
+import type { Match, MatchEvent, Player } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
@@ -19,17 +21,28 @@ import {
   logGoal,
   pauseMatch,
   resumeMatch,
+  softDeleteEvent,
   startMatch,
   startSecondHalf,
 } from '@/features/match/matchActions';
 import { ShootoutModal } from '@/features/match/components/ShootoutModal';
 
+/**
+ * Editor surface for the match reporter. Designed for one-handed phone use:
+ *  - Big colored state badge so glance-tells you what phase the match is in.
+ *  - Per-team player picker (with free-text fallback) — types are awful on
+ *    a phone in a stadium, dropdown removes the typo class entirely.
+ *  - Per-event delete button (soft-delete; rule-restricted to own events
+ *    + only the deleted-flag field).
+ *  - Confirms on every destructive transition (end / abandon / delete).
+ */
 export function AdminMatchEditorPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const active = useTournamentStore((s) => s.active);
   const uid = useAuthStore((s) => s.uid);
   const [match, setMatch] = useState<Match | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shootoutOpen, setShootoutOpen] = useState(false);
@@ -47,9 +60,13 @@ export function AdminMatchEditorPage() {
       ),
       (snap) => setEvents(snap.docs.map((d) => d.data())),
     );
+    const unsubPlayers = onSnapshot(playersCol(active.id), (snap) =>
+      setAllPlayers(snap.docs.map((d) => d.data())),
+    );
     return () => {
       unsubMatch();
       unsubEvents();
+      unsubPlayers();
     };
   }, [active, matchId]);
 
@@ -58,6 +75,20 @@ export function AdminMatchEditorPage() {
     if (!match) return 0;
     return match.clock.state === 'running' ? liveMinute : match.clock.displayMinute;
   }, [match, liveMinute]);
+
+  const playersByTeam = useMemo(() => {
+    const m = new Map<string, Player[]>();
+    for (const p of allPlayers) {
+      if (!p.active) continue;
+      const list = m.get(p.teamId) ?? [];
+      list.push(p);
+      m.set(p.teamId, list);
+    }
+    for (const list of m.values()) {
+      list.sort((a, b) => a.lastName.localeCompare(b.lastName, 'sr'));
+    }
+    return m;
+  }, [allPlayers]);
 
   if (!active || !match || !uid) {
     return <p className="text-sm text-ink-secondary">{sr.common.loading}</p>;
@@ -76,9 +107,10 @@ export function AdminMatchEditorPage() {
   }
 
   const halfMinutes = active.config.matchFormat.halfDurationSeconds / 60;
+  const status = badgeForStatus(match);
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-6 pb-12">
       <NavLink to="/admin/utakmice" className="text-sm text-ink-secondary hover:text-ink-primary">
         ← {sr.admin.nav.matches}
       </NavLink>
@@ -90,9 +122,19 @@ export function AdminMatchEditorPage() {
             <span className="tnum font-display text-6xl font-700 text-ink-primary">
               {match.score.a}:{match.score.b}
             </span>
-            <span className="mt-1 text-xs uppercase tracking-wide text-ink-tertiary">
-              {sr.match.status[match.status]} · {displayMinute}'
-              {match.clock.state === 'halftime' ? ` · ${sr.match.actions.halftime}` : ''}
+            <span
+              className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-700 uppercase tracking-wide ${status.cls}`}
+            >
+              {status.dot ? (
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-2 w-2 rounded-full ${status.dotCls}`}
+                />
+              ) : null}
+              {status.label}
+            </span>
+            <span className="mt-1 text-xs text-ink-tertiary">
+              {displayMinute}'
             </span>
           </div>
           <TeamHeader name={match.teamB.name} alignEnd />
@@ -107,23 +149,26 @@ export function AdminMatchEditorPage() {
         <TeamPanel
           side="a"
           match={match}
+          players={playersByTeam.get(match.teamA.teamId) ?? []}
           disabled={busy || match.status !== 'live'}
-          onGoal={(name) =>
+          onGoal={(player) =>
             act(() =>
               logGoal(active.id, match.id, uid, {
                 team: 'a',
                 minute: displayMinute,
-                playerName: name,
+                playerId: player.id,
+                playerName: player.name,
               }),
             )
           }
-          onCard={(type, name) =>
+          onCard={(type, player) =>
             act(() =>
               logCard(active.id, match.id, uid, {
                 team: 'a',
                 type,
                 minute: displayMinute,
-                playerName: name,
+                playerId: player.id,
+                playerName: player.name,
               }),
             )
           }
@@ -131,23 +176,26 @@ export function AdminMatchEditorPage() {
         <TeamPanel
           side="b"
           match={match}
+          players={playersByTeam.get(match.teamB.teamId) ?? []}
           disabled={busy || match.status !== 'live'}
-          onGoal={(name) =>
+          onGoal={(player) =>
             act(() =>
               logGoal(active.id, match.id, uid, {
                 team: 'b',
                 minute: displayMinute,
-                playerName: name,
+                playerId: player.id,
+                playerName: player.name,
               }),
             )
           }
-          onCard={(type, name) =>
+          onCard={(type, player) =>
             act(() =>
               logCard(active.id, match.id, uid, {
                 team: 'b',
                 type,
                 minute: displayMinute,
-                playerName: name,
+                playerId: player.id,
+                playerName: player.name,
               }),
             )
           }
@@ -173,9 +221,10 @@ export function AdminMatchEditorPage() {
             <Btn
               variant="ghost"
               busy={busy}
-              onClick={() =>
-                act(() => endHalf(active.id, match.id, uid, displayMinute))
-              }
+              onClick={() => {
+                if (!confirm('Zatvoriti poluvreme?')) return;
+                void act(() => endHalf(active.id, match.id, uid, displayMinute));
+              }}
             >
               {sr.match.actions.halftime}
             </Btn>
@@ -192,9 +241,7 @@ export function AdminMatchEditorPage() {
           <Btn
             busy={busy}
             onClick={() =>
-              act(() =>
-                startSecondHalf(active.id, match.id, uid, halfMinutes * 60),
-              )
+              act(() => startSecondHalf(active.id, match.id, uid, halfMinutes * 60))
             }
           >
             II poluvreme
@@ -212,7 +259,12 @@ export function AdminMatchEditorPage() {
                   setShootoutOpen(true);
                   return;
                 }
-                if (!confirm('Završiti utakmicu?')) return;
+                if (
+                  !confirm(
+                    `Završiti utakmicu sa rezultatom ${match.score.a}:${match.score.b}?`,
+                  )
+                )
+                  return;
                 void act(() => endMatch(active.id, match.id, uid, displayMinute));
               }}
             >
@@ -222,7 +274,7 @@ export function AdminMatchEditorPage() {
               variant="ghost"
               busy={busy}
               onClick={() => {
-                if (!confirm('Prekinuti utakmicu?')) return;
+                if (!confirm('Prekinuti utakmicu? Akcija je trajna.')) return;
                 void act(() => abandonMatch(active.id, match.id, uid, displayMinute));
               }}
             >
@@ -251,13 +303,28 @@ export function AdminMatchEditorPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {events.map((e) => (
-              <EventRow key={e.id} event={e} match={match} />
+              <EventRow
+                key={e.id}
+                event={e}
+                match={match}
+                canDelete={e.createdBy === uid && match.status === 'live'}
+                onDelete={() =>
+                  act(() => softDeleteEvent(active.id, match.id, e, uid))
+                }
+              />
             ))}
           </ul>
         )}
       </section>
     </section>
   );
+}
+
+// ---------------------------------------------------------------------------
+
+interface PickedPlayer {
+  id?: string;
+  name: string;
 }
 
 function TeamHeader({ name, alignEnd }: { name: string; alignEnd?: boolean }) {
@@ -271,58 +338,112 @@ function TeamHeader({ name, alignEnd }: { name: string; alignEnd?: boolean }) {
 function TeamPanel({
   side,
   match,
+  players,
   disabled,
   onGoal,
   onCard,
 }: {
   side: 'a' | 'b';
   match: Match;
+  players: Player[];
   disabled: boolean;
-  onGoal: (playerName: string) => void;
-  onCard: (type: 'yellowCard' | 'redCard', playerName: string) => void;
+  onGoal: (player: PickedPlayer) => void;
+  onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
 }) {
   const team = side === 'a' ? match.teamA : match.teamB;
-  const [name, setName] = useState('');
+  const [pickedId, setPickedId] = useState<string>('');
+  const [otherName, setOtherName] = useState('');
+
+  function pickedPlayer(): PickedPlayer | null {
+    if (pickedId === 'other') {
+      const trimmed = otherName.trim();
+      if (!trimmed) return null;
+      return { name: trimmed };
+    }
+    if (pickedId) {
+      const p = players.find((x) => x.id === pickedId);
+      if (!p) return null;
+      return { id: p.id, name: p.displayName };
+    }
+    return null;
+  }
+
+  function reset() {
+    setPickedId('');
+    setOtherName('');
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-surface-1 p-4 shadow-card">
       <h3 className="font-display text-sm font-600 text-ink-secondary">{team.name}</h3>
-      <input
-        placeholder="Ime strelca / kartonaša"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
-      />
+
+      <select
+        value={pickedId}
+        onChange={(e) => setPickedId(e.target.value)}
+        className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+        disabled={disabled}
+      >
+        <option value="">— Izaberi igrača —</option>
+        {players.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.displayName}
+          </option>
+        ))}
+        <option value="other">Drugi (unesi ručno)</option>
+      </select>
+
+      {pickedId === 'other' ? (
+        <input
+          placeholder="Ime i prezime"
+          value={otherName}
+          onChange={(e) => setOtherName(e.target.value)}
+          className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+          disabled={disabled}
+        />
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || !pickedPlayer()}
           onClick={() => {
-            onGoal(name.trim());
-            setName('');
+            const p = pickedPlayer();
+            if (p) {
+              onGoal(p);
+              reset();
+            }
           }}
-          className="h-touch rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
+          className="h-touch min-w-[6rem] flex-1 rounded-md bg-brand-600 px-4 font-700 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
         >
           ⚽ {sr.match.actions.addGoal}
         </button>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || !pickedPlayer()}
           onClick={() => {
-            onCard('yellowCard', name.trim());
-            setName('');
+            const p = pickedPlayer();
+            if (p) {
+              onCard('yellowCard', p);
+              reset();
+            }
           }}
-          className="h-touch rounded-md bg-warning-soft px-4 font-600 text-warning disabled:opacity-60"
+          className="h-touch min-w-[3.5rem] rounded-md bg-warning-soft px-4 font-600 text-warning disabled:opacity-60"
+          aria-label="Žuti karton"
         >
           🟨
         </button>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || !pickedPlayer()}
           onClick={() => {
-            onCard('redCard', name.trim());
-            setName('');
+            const p = pickedPlayer();
+            if (p) {
+              onCard('redCard', p);
+              reset();
+            }
           }}
-          className="h-touch rounded-md bg-danger-soft px-4 font-600 text-danger disabled:opacity-60"
+          className="h-touch min-w-[3.5rem] rounded-md bg-danger-soft px-4 font-600 text-danger disabled:opacity-60"
+          aria-label="Crveni karton"
         >
           🟥
         </button>
@@ -331,7 +452,17 @@ function TeamPanel({
   );
 }
 
-function EventRow({ event, match }: { event: MatchEvent; match: Match }) {
+function EventRow({
+  event,
+  match,
+  canDelete,
+  onDelete,
+}: {
+  event: MatchEvent;
+  match: Match;
+  canDelete: boolean;
+  onDelete: () => void;
+}) {
   const teamName =
     event.team === 'a' ? match.teamA.name : event.team === 'b' ? match.teamB.name : '';
   const label =
@@ -357,6 +488,19 @@ function EventRow({ event, match }: { event: MatchEvent; match: Match }) {
         <span className="text-ink-tertiary">{teamName}</span> {label}
         {event.playerName ? ` — ${event.playerName}` : ''}
       </span>
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirm(`Obrisati: ${label}${event.playerName ? ` — ${event.playerName}` : ''}?`)) return;
+            onDelete();
+          }}
+          className="rounded-md p-2 text-ink-tertiary hover:bg-surface-2 hover:text-danger"
+          aria-label="Obriši događaj"
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
     </li>
   );
 }
@@ -388,4 +532,36 @@ function Btn({
       {children}
     </button>
   );
+}
+
+// ---------------------------------------------------------------------------
+
+function badgeForStatus(match: Match): {
+  label: string;
+  cls: string;
+  dot?: boolean;
+  dotCls?: string;
+} {
+  if (match.status === 'scheduled') {
+    return { label: 'Zakazana', cls: 'bg-surface-2 text-ink-secondary' };
+  }
+  if (match.status === 'finished') {
+    return { label: 'Završena', cls: 'bg-surface-2 text-ink-secondary' };
+  }
+  if (match.status === 'abandoned') {
+    return { label: 'Prekinuta', cls: 'bg-danger-soft text-danger' };
+  }
+  // live
+  if (match.clock.state === 'paused') {
+    return { label: 'Pauzirano', cls: 'bg-warning-soft text-warning' };
+  }
+  if (match.clock.state === 'halftime') {
+    return { label: 'Poluvreme', cls: 'bg-warning-soft text-warning' };
+  }
+  return {
+    label: 'Uživo',
+    cls: 'bg-live-soft text-live',
+    dot: true,
+    dotCls: 'bg-live animate-pulse',
+  };
 }

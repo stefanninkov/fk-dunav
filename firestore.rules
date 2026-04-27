@@ -135,7 +135,14 @@ service cloud.firestore {
         match /events/{eventId} {
           allow read: if true;
           allow create: if hasCap('matches');
-          allow update, delete: if isAdmin();
+          // Reporters can soft-delete their OWN events (typo recovery)
+          // — only the deleted/deletedAt/deletedBy fields may change.
+          allow update: if isAdmin()
+            || (hasCap('matches')
+                && resource.data.createdBy == request.auth.uid
+                && request.resource.data.diff(resource.data).changedKeys()
+                     .hasOnly(['deleted', 'deletedAt', 'deletedBy']));
+          allow delete: if isAdmin();
         }
       }
 

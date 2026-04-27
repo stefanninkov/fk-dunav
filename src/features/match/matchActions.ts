@@ -305,6 +305,33 @@ export async function logCard(
   await batch.commit();
 }
 
+/**
+ * Soft-delete an event so the public timeline + score recompute skip it.
+ * Reporters can delete their OWN events (rule-enforced); admins can
+ * delete anyone's. If the event was a goal, decrement the cached score.
+ */
+export async function softDeleteEvent(
+  tournamentId: string,
+  matchId: string,
+  event: MatchEvent,
+  uid: string,
+): Promise<void> {
+  const batch = writeBatch(db);
+  batch.update(matchEventDoc(tournamentId, matchId, event.id), {
+    deleted: true,
+    deletedAt: serverTimestamp(),
+    deletedBy: uid,
+  });
+  if (event.type === 'goal' && (event.team === 'a' || event.team === 'b')) {
+    batch.update(matchDoc(tournamentId, matchId), {
+      [`score.${event.team}`]: increment(-1),
+      updatedAt: serverTimestamp(),
+      updatedBy: uid,
+    });
+  }
+  await batch.commit();
+}
+
 // ---------------------------------------------------------------------------
 // Internal
 
