@@ -7,6 +7,8 @@ import {
   followMatch,
   unfollowMatch,
 } from '@/features/push/followMatch';
+import { iosNeedsInstallForPush } from '@/features/push/iosInstall';
+import { IosInstallSheet } from '@/features/push/IosInstallSheet';
 
 const FCM_TOKEN_KEY = 'fk-dunav:fcm-token';
 
@@ -24,6 +26,7 @@ export function FollowMatchButton({ matchId }: Props) {
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [iosSheet, setIosSheet] = useState(false);
 
   // Hydrate from the stored token + a Firestore snapshot listener so the
   // UI stays truthy even if the user subscribes on another tab.
@@ -49,19 +52,25 @@ export function FollowMatchButton({ matchId }: Props) {
     try {
       if (following) {
         await unfollowMatch(matchId);
-      } else {
-        const t = await followMatch(matchId);
-        if (!t) {
-          setError(
-            typeof Notification !== 'undefined' &&
-              Notification.permission === 'denied'
-              ? 'Notifikacije su blokirane u browseru.'
-              : 'Push nije podržan na ovom uređaju.',
-          );
-          return;
-        }
-        setToken(t);
+        return;
       }
+      // iOS Safari users have to install the PWA first; show the
+      // step-by-step sheet instead of silently failing on requestPermission.
+      if (iosNeedsInstallForPush()) {
+        setIosSheet(true);
+        return;
+      }
+      const t = await followMatch(matchId);
+      if (!t) {
+        setError(
+          typeof Notification !== 'undefined' &&
+            Notification.permission === 'denied'
+            ? 'Notifikacije su blokirane u browseru.'
+            : 'Push nije podržan na ovom uređaju.',
+        );
+        return;
+      }
+      setToken(t);
     } finally {
       setBusy(false);
     }
@@ -86,6 +95,7 @@ export function FollowMatchButton({ matchId }: Props) {
         {label}
       </button>
       {error ? <span className="text-xs text-danger">{error}</span> : null}
+      {iosSheet ? <IosInstallSheet onClose={() => setIosSheet(false)} /> : null}
     </div>
   );
 }
