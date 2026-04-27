@@ -15,6 +15,8 @@ import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions/v1';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { defineSecret } from 'firebase-functions/params';
 import { v1 as firestoreV1 } from '@google-cloud/firestore';
 import * as crypto from 'crypto';
 
@@ -695,3 +697,145 @@ export const scheduledFirestoreBackup = functions
       outputUri: `gs://${BACKUP_BUCKET}/backups/${stamp}`,
     });
   });
+
+// ---------------------------------------------------------------------------
+// onInviteCreate — email a magic-link invite via Resend
+// ---------------------------------------------------------------------------
+//
+// Triggered when the admin creates /invites/{email}. Generates a sign-in
+// link with Firebase Admin SDK and emails it to the invitee through
+// Resend (https://resend.com — free up to 3000/month, simple HTTP API).
+// Records `notifiedAt` on the invite doc so we don't double-send if the
+// admin re-saves a row.
+//
+// Setup:
+//   1. Create a Resend account, generate an API key.
+//   2. Set the secret:
+//        firebase functions:secrets:set RESEND_API_KEY
+//      (paste the key when prompted; it's stored in Google Secret Manager).
+//   3. Verify a sender domain on Resend OR use their onboarding sandbox
+//      sender (limited to your own email until verified).
+//   4. Edit INVITE_FROM below if you want to send from a custom domain
+//      after verification.
+
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
+const INVITE_FROM = 'FK Dunav <onboarding@resend.dev>';
+const INVITE_BASE_URL = 'https://stefanninkov.github.io/fk-dunav/admin/login';
+
+async function generateSignInLink(email: string): Promise<string> {
+  return admin.auth().generateSignInWithEmailLink(email, {
+    url: INVITE_BASE_URL,
+    handleCodeInApp: true,
+  });
+}
+
+function inviteEmailHtml(link: string, capLabels: string[]): string {
+  const caps = capLabels.length
+    ? `<p style="margin: 0 0 16px;">Imaš pristup ovim sekcijama:</p>
+       <ul style="margin: 0 0 24px; padding-left: 20px;">
+         ${capLabels.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}
+       </ul>`
+    : '';
+  return `<!doctype html>
+<html lang="sr-Latn">
+  <body style="font-family: -apple-system, system-ui, sans-serif; background: #000c1e; color: #e8eef6; padding: 24px;">
+    <div style="max-width: 480px; margin: 0 auto; background: #0e1e3a; padding: 32px; border-radius: 12px;">
+      <h1 style="font-size: 20px; margin: 0 0 12px;">FK Dunav Ostrovo</h1>
+      <p style="margin: 0 0 16px;">Pozvan/a si kao saradnik u admin panel turnira.</p>
+      ${caps}
+      <p style="margin: 0 0 24px;">Klikni dugme ispod da se uloguješ:</p>
+      <p style="margin: 0 0 24px;">
+        <a href="${escapeHtml(link)}"
+           style="display: inline-block; background: #f4c542; color: #1a0e00; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 700;">
+          Uloguj se
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #aab8cf; margin: 0;">
+        Link je važeći jednokratno i ističe za 30 minuta. Ako ga ne klikneš,
+        pošalji mi mejl da pošaljem novi.
+      </p>
+    </div>
+  </body>
+</html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const CAP_LABELS_SR: Record<string, string> = {
+  matches: 'Utakmice (rezultat + statistika)',
+  teams: 'Timovi i igrači',
+  photos: 'Moderacija galerije',
+  side_events: 'Bočna takmičenja (Kup Šanka, Prečka, Lutrija, Nagrade)',
+  content: 'Obaveštenja, sadržaj, sponzori',
+};
+
+export const onInviteCreate = onDocumentCreated(
+  {
+    document: 'invites/{email}',
+    region: 'europe-west3',
+    secrets: [RESEND_API_KEY],
+  },
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const email = String(data.email ?? event.params.email);
+    if (!email) return;
+
+    // Build readable cap list for the email body.
+    const caps = Array.isArray(data.caps) ? (data.caps as string[]) : [];
+    const labels = caps.map((c) => CAP_LABELS_SR[c] ?? c);
+
+    let link: string;
+    try {
+      link = await generateSignInLink(email);
+    } catch (err) {
+      functions.logger.error('generateSignInLink failed', { email, err });
+      return;
+    }
+
+    const apiKey = RESEND_API_KEY.value();
+    if (!apiKey) {
+      functions.logger.warn(
+        'RESEND_API_KEY not set — invite created but no email sent. ' +
+          'Run `firebase functions:secrets:set RESEND_API_KEY` and redeploy.',
+        { email },
+      );
+      return;
+    }
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: INVITE_FROM,
+        to: [email],
+        subject: 'Pozivnica: FK Dunav admin panel',
+        html: inviteEmailHtml(link, labels),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      functions.logger.error('Resend send failed', {
+        email,
+        status: res.status,
+        body,
+      });
+      return;
+    }
+
+    await event.data?.ref.update({
+      notifiedAt: FieldValue.serverTimestamp(),
+    });
+  },
+);
