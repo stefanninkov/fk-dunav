@@ -3,15 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  isSignInWithEmailLink,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
-} from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 
 import logoUrl from '@/assets/logo.svg';
-import { auth } from '@/lib/firebase';
+import { getAuthInstance } from '@/lib/firebase';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -46,6 +41,8 @@ export function LoginPage() {
   // Completing a sign-in from an email link.
   useEffect(() => {
     async function finishSignIn() {
+      const [auth, { isSignInWithEmailLink, signInWithEmailLink }] =
+        await Promise.all([getAuthInstance(), import('firebase/auth')]);
       if (!isSignInWithEmailLink(auth, window.location.href)) return;
       setFinishing(true);
       setError(null);
@@ -79,6 +76,10 @@ export function LoginPage() {
   async function onSubmit({ email }: FormValues) {
     setError(null);
     try {
+      const [auth, { sendSignInLinkToEmail }] = await Promise.all([
+        getAuthInstance(),
+        import('firebase/auth'),
+      ]);
       // Continue URL must match an Authorized Domain in Firebase Auth and
       // include the full path under the Vite base (/fk-dunav/ on GH Pages).
       const continueUrl = `${window.location.origin}${import.meta.env.BASE_URL}admin/login`;

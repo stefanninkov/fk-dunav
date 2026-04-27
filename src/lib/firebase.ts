@@ -9,7 +9,6 @@ import {
   isSupported as isAnalyticsSupported,
   type Analytics,
 } from 'firebase/analytics';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -24,12 +23,14 @@ import {
   isSupported as isMessagingSupported,
   type Messaging,
 } from 'firebase/messaging';
+import type { Auth } from 'firebase/auth';
 
 /**
  * Firebase config is read from Vite env vars (VITE_FIREBASE_*). The values
- * are not secrets — the JS SDK config is designed to be shipped to browsers,
- * and access is gated server-side by Firestore/Storage rules + Auth domain
- * whitelist + App Check. See README for the full list.
+ * are not secrets — Firebase JS SDK config is designed to be shipped to
+ * browsers, and access is gated server-side by Firestore/Storage rules,
+ * Firebase Auth authorized domains, and App Check. See README for the full
+ * list.
  */
 const firebaseConfig: FirebaseOptions = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -47,16 +48,12 @@ export const firebaseApp: FirebaseApp = initializeApp(firebaseConfig);
 
 /**
  * App Check — proves requests come from our real web app, not a script.
- * Must be initialized BEFORE any other Firebase service call so every
- * outgoing request carries the token. In dev (emulators on, or no site
- * key) we skip entirely; in dev against real prod, set
- *   (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
- * before this runs to get a per-browser debug token, then whitelist it in
- * the Firebase console → App Check → Debug tokens.
+ * Initialized eagerly because every Firestore read on the public site
+ * needs a token. App Check SDK is small (~5 KB gzipped) so the cost is
+ * fine.
  *
- * Enforcement is controlled PER-SERVICE in the Firebase console. We ship
- * unenforced first, watch metrics, then flip enforcement on once 95%+ of
- * requests carry valid tokens.
+ * Enforcement is controlled per-service in the Firebase console; the
+ * client always tries to send a token whether enforcement is on or not.
  */
 const appCheckSiteKey = import.meta.env.VITE_APPCHECK_SITE_KEY;
 export let appCheck: AppCheck | null = null;
@@ -67,26 +64,43 @@ if (appCheckSiteKey && !useEmulators) {
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {
-    // Double-init throws in dev with HMR; safe to swallow.
     console.warn('App Check init skipped:', err);
   }
 }
 
-// Firestore with offline persistence enabled from the start — mandatory for
-// the reporter workflow. Multi-tab manager keeps tabs in sync.
+// Firestore with offline persistence enabled from the start — mandatory
+// for the reporter workflow. Multi-tab manager keeps tabs in sync.
 export const db: Firestore = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 
-export const auth: Auth = getAuth(firebaseApp);
 export const storage: FirebaseStorage = getStorage(firebaseApp);
 export const functions: Functions = getFunctions(firebaseApp, 'europe-west3');
 
 if (useEmulators) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+}
+
+/**
+ * Auth — lazy-loaded so the public site (which is anonymous-only) doesn't
+ * download the 34 KB gzipped firebase/auth module. First call to
+ * `getAuthInstance()` dynamically imports the module, returns a singleton
+ * Auth instance, and (in emulator mode) wires the connection.
+ */
+let authInstancePromise: Promise<Auth> | null = null;
+export function getAuthInstance(): Promise<Auth> {
+  if (authInstancePromise) return authInstancePromise;
+  authInstancePromise = (async () => {
+    const { getAuth, connectAuthEmulator } = await import('firebase/auth');
+    const auth = getAuth(firebaseApp);
+    if (useEmulators) {
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    }
+    return auth;
+  })();
+  return authInstancePromise;
 }
 
 /**
