@@ -20,6 +20,7 @@ import type {
   MatchPhase,
   TeamSnapshot,
 } from '@/lib/firestore/types';
+import { stripUndefined } from '@/lib/utils/stripUndefined';
 
 export interface CreateMatchInput {
   phase: MatchPhase;
@@ -38,29 +39,32 @@ export async function createMatch(
 ): Promise<string> {
   const ref = doc(matchesCol(tournamentId));
   const batch = writeBatch(db);
-  batch.set(ref, {
-    tournamentId,
-    phase: input.phase,
-    groupId: input.groupId,
-    knockoutRound: input.knockoutRound,
-    bracketSlot: input.bracketSlot,
-    field: input.field,
-    scheduledStart: Timestamp.fromDate(input.scheduledStart),
-    teamA: input.teamA,
-    teamB: input.teamB,
-    score: { a: 0, b: 0 },
-    status: 'scheduled',
-    clock: {
-      state: 'idle',
-      currentHalf: 1,
-      halfStartedAt: null,
-      accumulatedSeconds: 0,
-      displayMinute: 0,
-    },
-    lockedForEdit: false,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  } as unknown as Match);
+  batch.set(
+    ref,
+    stripUndefined({
+      tournamentId,
+      phase: input.phase,
+      groupId: input.groupId,
+      knockoutRound: input.knockoutRound,
+      bracketSlot: input.bracketSlot,
+      field: input.field,
+      scheduledStart: Timestamp.fromDate(input.scheduledStart),
+      teamA: input.teamA,
+      teamB: input.teamB,
+      score: { a: 0, b: 0 },
+      status: 'scheduled',
+      clock: {
+        state: 'idle',
+        currentHalf: 1,
+        halfStartedAt: null,
+        accumulatedSeconds: 0,
+        displayMinute: 0,
+      },
+      lockedForEdit: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }) as unknown as Match,
+  );
   await batch.commit();
   return ref.id;
 }
@@ -316,13 +320,13 @@ async function appendEventBatch(
 ): Promise<void> {
   const clientEventId = crypto.randomUUID();
   const ref = matchEventDoc(tournamentId, matchId, clientEventId);
-  const payload: Partial<MatchEvent> = {
+  const payload = stripUndefined({
     ...partial,
     matchId,
     clientEventId,
     loggedAt: Timestamp.now(),
     serverTimestamp: Timestamp.now(),
     deleted: false,
-  };
+  });
   batch.set(doc(ref.firestore, ref.path), payload as never);
 }
