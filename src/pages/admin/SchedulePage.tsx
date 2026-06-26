@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,7 +9,11 @@ import { groupsCol, matchesCol, teamsCol } from '@/lib/firestore/refs';
 import type { Group, Match, Team, TeamSnapshot } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
-import { createMatch } from '@/features/match/matchActions';
+import {
+  createMatch,
+  deleteMatch,
+  updateMatchSchedule,
+} from '@/features/match/matchActions';
 
 const schema = z
   .object({
@@ -26,12 +30,33 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
+// Firestore rejects undefined field values, so build the snapshot
+// conditionally — optional team fields are only added when populated.
+function teamSnapshot(team: Team): TeamSnapshot {
+  const out: TeamSnapshot = {
+    teamId: team.id,
+    name: team.name,
+    groupId: team.groupId,
+  };
+  if (team.shortName) out.shortName = team.shortName;
+  if (team.logoUrl) out.logoUrl = team.logoUrl;
+  return out;
+}
+
+function toLocalDatetime(d: Date): string {
+  // datetime-local needs YYYY-MM-DDTHH:mm with no timezone suffix and
+  // local time (not UTC). toISOString() returns UTC so we offset manually.
+  const offsetMs = d.getTimezoneOffset() * 60_000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
 export function SchedulePage() {
   const active = useTournamentStore((s) => s.active);
   const [teams, setTeams] = useState<Team[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active) {
@@ -116,9 +141,26 @@ export function SchedulePage() {
                 })}
               </h2>
               <ul className="flex flex-col gap-2">
-                {dayMatches.map((m) => (
-                  <MatchRow key={m.id} match={m} />
-                ))}
+                {dayMatches.map((m) =>
+                  editingId === m.id ? (
+                    <EditMatchRow
+                      key={m.id}
+                      match={m}
+                      tournamentId={active.id}
+                      teams={teams}
+                      groups={groups}
+                      fields={active.config.fields}
+                      onDone={() => setEditingId(null)}
+                    />
+                  ) : (
+                    <MatchRow
+                      key={m.id}
+                      match={m}
+                      tournamentId={active.id}
+                      onEdit={() => setEditingId(m.id)}
+                    />
+                  ),
+                )}
               </ul>
             </section>
           ))}
@@ -128,16 +170,43 @@ export function SchedulePage() {
   );
 }
 
-function MatchRow({ match }: { match: Match }) {
+function MatchRow({
+  match,
+  tournamentId,
+  onEdit,
+}: {
+  match: Match;
+  tournamentId: string;
+  onEdit: () => void;
+}) {
   const time = match.scheduledStart.toDate().toLocaleTimeString('sr-RS', {
     hour: '2-digit',
     minute: '2-digit',
   });
+  // Live or finished matches are managed from the match editor, not from
+  // the schedule list — editing teams retroactively would corrupt event
+  // logs. Allow only the destructive delete with a heavier confirm there.
+  const isScheduled = match.status === 'scheduled';
+
+  async function handleDelete() {
+    if (!confirm(`Obrisati utakmicu ${match.teamA.name} vs ${match.teamB.name}?`))
+      return;
+    if (!isScheduled) {
+      if (
+        !confirm(
+          `Utakmica nije više "zakazana" (${sr.match.status[match.status]}). Sigurno?`,
+        )
+      )
+        return;
+    }
+    await deleteMatch(tournamentId, match.id);
+  }
+
   return (
-    <li className="flex items-center gap-3 rounded-lg bg-surface-1 px-4 py-3 shadow-card">
+    <li className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-1 px-4 py-3 shadow-card">
       <span className="tnum w-14 text-ink-secondary">{time}</span>
       <span className="text-xs text-ink-tertiary">{match.field}</span>
-      <div className="ml-2 flex-1 items-center text-ink-primary">
+      <div className="ml-2 min-w-[10rem] flex-1 items-center text-ink-primary">
         <span className="font-500">{match.teamA.name}</span>
         <span className="mx-2 text-ink-tertiary">vs</span>
         <span className="font-500">{match.teamB.name}</span>
@@ -145,6 +214,142 @@ function MatchRow({ match }: { match: Match }) {
       <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-secondary">
         {sr.match.status[match.status]}
       </span>
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={!isScheduled}
+        title={isScheduled ? sr.common.edit : 'Otvori editor utakmice'}
+        className="rounded-md p-2 text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:opacity-40"
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleDelete()}
+        className="rounded-md p-2 text-ink-tertiary hover:bg-surface-2 hover:text-danger"
+        aria-label={sr.common.delete}
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  );
+}
+
+function EditMatchRow({
+  match,
+  tournamentId,
+  teams,
+  groups,
+  fields,
+  onDone,
+}: {
+  match: Match;
+  tournamentId: string;
+  teams: Team[];
+  groups: Group[];
+  fields: string[];
+  onDone: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      teamAId: match.teamA.teamId,
+      teamBId: match.teamB.teamId,
+      field: match.field,
+      groupId: match.groupId ?? groups[0]?.id ?? '',
+      scheduledStart: toLocalDatetime(match.scheduledStart.toDate()),
+    },
+  });
+
+  async function onSubmit(v: FormValues) {
+    setError(null);
+    const a = teams.find((t) => t.id === v.teamAId);
+    const b = teams.find((t) => t.id === v.teamBId);
+    if (!a || !b) {
+      setError('Neispravan tim');
+      return;
+    }
+    try {
+      await updateMatchSchedule(tournamentId, match.id, {
+        scheduledStart: new Date(v.scheduledStart),
+        field: v.field,
+        groupId: v.groupId,
+        teamA: teamSnapshot(a),
+        teamB: teamSnapshot(b),
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    }
+  }
+
+  return (
+    <li className="flex flex-col gap-2 rounded-lg bg-surface-1 px-4 py-3 shadow-card">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="grid grid-cols-1 gap-2 sm:grid-cols-6"
+      >
+        <select className={inputClass} {...register('teamAId')}>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <select className={inputClass} {...register('teamBId')}>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <select className={inputClass} {...register('field')}>
+          {fields.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <select className={inputClass} {...register('groupId')}>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+        <input
+          type="datetime-local"
+          className={inputClass}
+          {...register('scheduledStart')}
+        />
+        <div className="flex items-center gap-2 sm:justify-end">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex h-touch items-center justify-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+          <button
+            type="button"
+            onClick={onDone}
+            className="inline-flex h-touch items-center justify-center rounded-md border border-surface-4 px-3 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.cancel}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        {(errors.teamBId || errors.scheduledStart || error) && (
+          <p className="text-xs text-danger sm:col-span-6">
+            {errors.teamBId?.message ?? errors.scheduledStart?.message ?? error}
+          </p>
+        )}
+      </form>
     </li>
   );
 }
@@ -186,26 +391,14 @@ function AddMatchForm({
       setError('Neispravan tim');
       return;
     }
-    // Firestore rejects undefined field values, so build the snapshot
-    // conditionally — optional team fields are only added when populated.
-    const snap = (team: Team): TeamSnapshot => {
-      const out: TeamSnapshot = {
-        teamId: team.id,
-        name: team.name,
-        groupId: team.groupId,
-      };
-      if (team.shortName) out.shortName = team.shortName;
-      if (team.logoUrl) out.logoUrl = team.logoUrl;
-      return out;
-    };
     try {
       await createMatch(tournamentId, {
         phase: 'group',
         groupId: v.groupId,
         field: v.field,
         scheduledStart: new Date(v.scheduledStart),
-        teamA: snap(a),
-        teamB: snap(b),
+        teamA: teamSnapshot(a),
+        teamB: teamSnapshot(b),
       });
       reset({ ...v, scheduledStart: '' });
     } catch (e) {

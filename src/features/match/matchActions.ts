@@ -1,4 +1,5 @@
 import {
+  deleteDoc,
   doc,
   increment,
   serverTimestamp,
@@ -74,13 +75,33 @@ export async function createMatch(
 export async function updateMatchSchedule(
   tournamentId: string,
   matchId: string,
-  patch: { scheduledStart?: Date; field?: string; groupId?: string },
+  patch: {
+    scheduledStart?: Date;
+    field?: string;
+    groupId?: string;
+    teamA?: TeamSnapshot;
+    teamB?: TeamSnapshot;
+  },
 ): Promise<void> {
   const body: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (patch.scheduledStart) body.scheduledStart = Timestamp.fromDate(patch.scheduledStart);
   if (patch.field !== undefined) body.field = patch.field;
   if (patch.groupId !== undefined) body.groupId = patch.groupId;
+  if (patch.teamA !== undefined) body.teamA = stripUndefinedDeep(patch.teamA);
+  if (patch.teamB !== undefined) body.teamB = stripUndefinedDeep(patch.teamB);
   await updateDoc(matchDoc(tournamentId, matchId), body);
+}
+
+/**
+ * Delete a match doc outright. The admin is responsible for confirming
+ * before calling — live or finished matches usually shouldn't be deleted
+ * because they hold the event log and the standings recompute reads them.
+ */
+export async function deleteMatch(
+  tournamentId: string,
+  matchId: string,
+): Promise<void> {
+  await deleteDoc(matchDoc(tournamentId, matchId));
 }
 
 // ---------------------------------------------------------------------------
