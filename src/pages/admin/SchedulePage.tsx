@@ -186,13 +186,18 @@ function AddMatchForm({
       setError('Neispravan tim');
       return;
     }
-    const snap = (team: Team): TeamSnapshot => ({
-      teamId: team.id,
-      name: team.name,
-      shortName: team.shortName,
-      logoUrl: team.logoUrl,
-      groupId: team.groupId,
-    });
+    // Firestore rejects undefined field values, so build the snapshot
+    // conditionally — optional team fields are only added when populated.
+    const snap = (team: Team): TeamSnapshot => {
+      const out: TeamSnapshot = {
+        teamId: team.id,
+        name: team.name,
+        groupId: team.groupId,
+      };
+      if (team.shortName) out.shortName = team.shortName;
+      if (team.logoUrl) out.logoUrl = team.logoUrl;
+      return out;
+    };
     try {
       await createMatch(tournamentId, {
         phase: 'group',

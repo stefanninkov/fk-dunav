@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react';
-import { onSnapshot } from 'firebase/firestore';
-import { Dices, Eye, EyeOff, ExternalLink, RotateCcw } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { Dices, RotateCcw } from 'lucide-react';
 
-import { groupDrawSessionDoc } from '@/lib/firestore/refs';
-import type { Group, GroupDrawSession, Team } from '@/lib/firestore/types';
+import type { Group, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   drawNextTeamToGroup,
   resetGroupDraw,
-  setGroupDrawDrumVisible,
 } from '@/features/team/groupDrawActions';
 
 interface Props {
@@ -21,20 +17,14 @@ interface Props {
 
 /**
  * Admin sub-section on /admin/timovi. Shows the unassigned-team pool,
- * per-group head counts, and the draw controls. "Pokaži bubanj" toggles
- * a `drumVisible` flag the public /grupe page reads to reveal the drum.
+ * per-group head counts, and the draw controls. Each "Izvuci sledeći
+ * tim" picks a random unassigned team and seeds it into the group with
+ * the fewest current members.
  */
 export function GroupDrawPanel({ tournamentId, groups, teams }: Props) {
   const uid = useAuthStore((s) => s.uid);
-  const [session, setSession] = useState<GroupDrawSession | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    return onSnapshot(groupDrawSessionDoc(tournamentId), (snap) =>
-      setSession(snap.exists() ? snap.data() : null),
-    );
-  }, [tournamentId]);
 
   const activeTeams = teams.filter((t) => !t.deletedAt);
   const unassigned = activeTeams.filter((t) => !t.groupId);
@@ -44,13 +34,6 @@ export function GroupDrawPanel({ tournamentId, groups, teams }: Props) {
     if (t.groupId && perGroup.has(t.groupId)) {
       perGroup.set(t.groupId, (perGroup.get(t.groupId) ?? 0) + 1);
     }
-  }
-
-  const drumVisible = session?.drumVisible ?? false;
-
-  async function toggleDrum() {
-    if (!uid) return;
-    await setGroupDrawDrumVisible(tournamentId, !drumVisible, uid);
   }
 
   async function draw() {
@@ -72,54 +55,18 @@ export function GroupDrawPanel({ tournamentId, groups, teams }: Props) {
     await resetGroupDraw(tournamentId);
   }
 
-  const canDraw =
-    groups.length > 0 && unassigned.length > 0 && !drawing;
+  const canDraw = groups.length > 0 && unassigned.length > 0 && !drawing;
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-surface-4 bg-surface-1/70 p-4">
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="font-display text-lg font-600">
-            {sr.admin.teams.drawTitle}
-          </h2>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {sr.admin.teams.drawHelp}
-          </p>
-        </div>
-        <NavLink
-          to="/grupe"
-          target="_blank"
-          className="inline-flex items-center gap-1 text-xs font-500 text-brand-400 hover:text-brand-300"
-        >
-          /grupe
-          <ExternalLink size={12} />
-        </NavLink>
+      <header>
+        <h2 className="font-display text-lg font-600">
+          {sr.admin.teams.drawTitle}
+        </h2>
+        <p className="mt-1 text-sm text-ink-secondary">
+          {sr.admin.teams.drawHelp}
+        </p>
       </header>
-
-      {/* Drum visibility toggle */}
-      <div
-        className={`flex flex-wrap items-center gap-3 rounded-md p-3 ${
-          drumVisible ? 'bg-brand-900/50' : 'bg-surface-2'
-        }`}
-      >
-        <div className="flex min-w-[10rem] flex-1 flex-col">
-          <span className="text-sm font-600 text-ink-primary">
-            {drumVisible ? sr.admin.lottery.drumOn : sr.admin.lottery.drumOff}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => void toggleDrum()}
-          className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-700 ${
-            drumVisible
-              ? 'border border-surface-4 text-ink-secondary hover:bg-surface-3'
-              : 'bg-accent-gold text-ink-inverse hover:opacity-90'
-          }`}
-        >
-          {drumVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-          {drumVisible ? sr.admin.teams.drawHideDrum : sr.admin.teams.drawShowDrum}
-        </button>
-      </div>
 
       {/* Group head counts */}
       {groups.length === 0 ? (

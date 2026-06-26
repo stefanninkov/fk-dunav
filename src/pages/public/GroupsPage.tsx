@@ -1,30 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
 
-import {
-  groupDrawSessionDoc,
-  groupsCol,
-  matchesCol,
-  teamsCol,
-} from '@/lib/firestore/refs';
-import type {
-  Group,
-  GroupDrawSession,
-  Match,
-  Team,
-} from '@/lib/firestore/types';
+import { groupsCol, matchesCol, teamsCol } from '@/lib/firestore/refs';
+import type { Group, Match, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { computeStandings, sortStandings } from '@/lib/utils/standings';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
-import { GroupDrawBubanj } from '@/features/team/components/GroupDrawBubanj';
 
 export function GroupsPage() {
   const active = useTournamentStore((s) => s.active);
   const [groups, setGroups] = useState<Group[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [drawSession, setDrawSession] = useState<GroupDrawSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,18 +30,12 @@ export function GroupsPage() {
       setMatches(snap.docs.map((d) => d.data()));
       setLoading(false);
     });
-    const unsubSession = onSnapshot(groupDrawSessionDoc(active.id), (snap) =>
-      setDrawSession(snap.exists() ? snap.data() : null),
-    );
     return () => {
       unsubGroups();
       unsubTeams();
       unsubMatches();
-      unsubSession();
     };
   }, [active]);
-
-  const drumVisible = drawSession?.drumVisible ?? false;
 
   const tables = useMemo(() => {
     if (!active) return [];
@@ -83,12 +65,6 @@ export function GroupsPage() {
   return (
     <section className="mx-auto max-w-[1200px] px-page-x py-10 lg:px-page-x-lg">
       <h1 className="font-display text-3xl font-700 sm:text-4xl">{sr.nav.groups}</h1>
-
-      {drumVisible ? (
-        <div className="mt-8">
-          <GroupDrawBubanj groups={groups} teams={teams} session={drawSession} />
-        </div>
-      ) : null}
 
       {loading ? (
         <p className="mt-6 text-sm text-ink-secondary">{sr.common.loading}</p>

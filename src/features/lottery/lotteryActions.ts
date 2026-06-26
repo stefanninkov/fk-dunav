@@ -109,8 +109,8 @@ export async function undrawLotteryWinner(
 }
 
 // ---------------------------------------------------------------------------
-// Session — the single "current" doc. Admin sets participantCount and
-// toggles drumVisible; public /lutrija reads both.
+// Session — single "current" doc holding the slip count. Public /lutrija
+// reads it for the pool size.
 
 export async function setLotteryParticipantCount(
   tournamentId: string,
@@ -121,22 +121,6 @@ export async function setLotteryParticipantCount(
     lotterySessionDoc(tournamentId),
     {
       participantCount: Math.max(0, Math.floor(count)),
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    } as unknown as LotterySession,
-    { merge: true },
-  );
-}
-
-export async function setLotteryDrumVisible(
-  tournamentId: string,
-  visible: boolean,
-  updatedBy: string,
-): Promise<void> {
-  await setDoc(
-    lotterySessionDoc(tournamentId),
-    {
-      drumVisible: visible,
       updatedAt: serverTimestamp(),
       updatedBy,
     } as unknown as LotterySession,

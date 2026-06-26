@@ -69,7 +69,11 @@ export function TeamsPage() {
         <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>
       ) : null}
 
-      <GroupsPanel tournamentId={active.id} groups={groups ?? []} />
+      <GroupsPanel
+        tournamentId={active.id}
+        groups={groups ?? []}
+        teams={teams ?? []}
+      />
 
       {teams === null ? (
         <p className="text-sm text-ink-secondary">{sr.common.loading}</p>

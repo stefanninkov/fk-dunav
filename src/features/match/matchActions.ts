@@ -20,7 +20,7 @@ import type {
   MatchPhase,
   TeamSnapshot,
 } from '@/lib/firestore/types';
-import { stripUndefined } from '@/lib/utils/stripUndefined';
+import { stripUndefined, stripUndefinedDeep } from '@/lib/utils/stripUndefined';
 
 export interface CreateMatchInput {
   phase: MatchPhase;
@@ -39,9 +39,11 @@ export async function createMatch(
 ): Promise<string> {
   const ref = doc(matchesCol(tournamentId));
   const batch = writeBatch(db);
+  // Deep strip so nested team-snapshot undefineds (e.g. shortName, logoUrl)
+  // don't sneak through; Firestore rejects undefined at any depth.
   batch.set(
     ref,
-    stripUndefined({
+    stripUndefinedDeep({
       tournamentId,
       phase: input.phase,
       groupId: input.groupId,

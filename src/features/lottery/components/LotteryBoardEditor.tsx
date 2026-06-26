@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Dices, ExternalLink, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { Dices, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
 import type { LotteryPrize } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
@@ -36,16 +35,8 @@ export function LotteryBoardEditor({
 
   return (
     <section className="flex flex-col gap-6">
-      <header className="flex items-center justify-between gap-3">
+      <header>
         <h2 className="font-display text-lg font-600">{sr.side.lottery.admin.title}</h2>
-        <NavLink
-          to="/lutrija"
-          target="_blank"
-          className="inline-flex items-center gap-1 text-xs font-500 text-brand-400 hover:text-brand-300"
-        >
-          {sr.side.lottery.admin.openBigScreen}
-          <ExternalLink size={12} />
-        </NavLink>
       </header>
 
       <CountSection

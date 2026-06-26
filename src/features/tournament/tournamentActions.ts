@@ -1,16 +1,19 @@
 import {
+  deleteDoc,
   doc,
   getDocs,
   query,
   runTransaction,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
 
 import { db } from '@/lib/firebase';
 import {
+  groupDoc,
   groupsCol,
   tournamentDoc,
   tournamentsCol,
@@ -143,4 +146,24 @@ export async function createGroup(
   } as never);
   await batch.commit();
   return ref.id;
+}
+
+export async function renameGroup(
+  tournamentId: string,
+  groupId: string,
+  name: string,
+): Promise<void> {
+  await updateDoc(groupDoc(tournamentId, groupId), { name: name.trim() });
+}
+
+/**
+ * Hard-delete a group. The caller is responsible for first reassigning
+ * any teams currently in this group (the GroupsPanel UI prevents the
+ * delete unless the group is empty so we don't orphan teams).
+ */
+export async function deleteGroup(
+  tournamentId: string,
+  groupId: string,
+): Promise<void> {
+  await deleteDoc(groupDoc(tournamentId, groupId));
 }

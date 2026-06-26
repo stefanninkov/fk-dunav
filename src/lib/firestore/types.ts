@@ -377,17 +377,15 @@ export interface LotteryPrize {
 }
 
 /**
- * Single-doc session state for the lottery. Admin sets:
- *   - `participantCount` — how many raffle slips were sold; draws pick a
- *     random integer from 1..count excluding already-drawn numbers.
- *   - `drumVisible` — when true, the public /lutrija view reveals the
- *     big rotating bubanj with numbered chips inside.
+ * Single-doc session state for the lottery. Stores the raffle slip
+ * count: the pool is 1..participantCount and draws pick a random
+ * integer from it, excluding numbers already recorded as winners on
+ * other prize docs.
  *
  * Doc id is fixed at "current".
  */
 export interface LotterySession {
   id: string;
-  drumVisible: boolean;
   /** Total slips sold — the pool is 1..participantCount. */
   participantCount: number;
   updatedAt: Timestamp;
@@ -395,14 +393,12 @@ export interface LotterySession {
 }
 
 /**
- * Single-doc session state for the group draw. Admin flips `drumVisible`
- * to reveal the drum on the public /grupe page; each draw writes the
- * newly-assigned team + group id so the public view can animate the ball
- * flying into the right group column.
+ * Single-doc session state for the group draw. Each draw writes the
+ * newly-assigned team + group id so admin (and any audit view) can see
+ * the most recent assignment.
  */
 export interface GroupDrawSession {
   id: string;
-  drumVisible: boolean;
   lastDrawnTeamId?: string;
   lastDrawnTeamName?: string;
   lastDrawnGroupId?: string;

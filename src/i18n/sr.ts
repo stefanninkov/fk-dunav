@@ -137,9 +137,7 @@ export const sr = {
       rosterEmpty: 'Još nema igrača u ekipi.',
       drawTitle: 'Izvlačenje grupa',
       drawHelp:
-        'Dodaj timove bez grupe i napravi željene grupe. Bubanj onda nasumično raspoređuje timove u grupe po seed redosledu.',
-      drawShowDrum: 'Pokaži bubanj na /grupe',
-      drawHideDrum: 'Sakrij bubanj',
+        'Dodaj timove bez grupe i napravi željene grupe. Klikom na "Izvuci sledeći tim" nasumično se raspoređuju timovi u grupe po seed redosledu.',
       drawNext: 'Izvuci sledeći tim',
       drawReset: 'Poništi celo izvlačenje',
       drawResetConfirm: 'Ovo će isprazniti sve grupe. Nastaviti?',
@@ -245,15 +243,6 @@ export const sr = {
       },
     },
 
-    lottery: {
-      drumOn: 'Bubanj je uključen',
-      drumOff: 'Bubanj je isključen',
-      drumHelp:
-        'Kada uključiš bubanj, na javnoj strani /lutrija pojaviće se veliki rotirajući bubanj sa učesnicima — spreman za izvlačenje.',
-      showDrum: 'Pokaži bubanj',
-      hideDrum: 'Sakrij bubanj',
-    },
-
     awards: {
       title: 'Nagrade',
       saved: 'Sa\u010Duvano.',
@@ -310,7 +299,6 @@ export const sr = {
         drawn: 'Izvučeno',
         winningNumber: 'Dobitni broj',
         undraw: 'Poništi izvlačenje',
-        openBigScreen: 'Otvori veliki ekran',
         poolSummary: (remaining: number, total: number) =>
           `U bubnju: ${remaining} / ${total} brojeva`,
         noPool: 'Prvo unesi broj učesnika (veći od izvučenih).',

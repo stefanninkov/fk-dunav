@@ -1,7 +1,6 @@
 import {
   getDocs,
   serverTimestamp,
-  setDoc,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
@@ -22,22 +21,6 @@ import type { Group, GroupDrawSession, Team } from '@/lib/firestore/types';
  * random unassigned team is dropped into it. Does not overwrite teams
  * that already have a groupId (per the admin's chosen policy).
  */
-
-export async function setGroupDrawDrumVisible(
-  tournamentId: string,
-  visible: boolean,
-  updatedBy: string,
-): Promise<void> {
-  await setDoc(
-    groupDrawSessionDoc(tournamentId),
-    {
-      drumVisible: visible,
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    } as unknown as GroupDrawSession,
-    { merge: true },
-  );
-}
 
 export interface DrawGroupResult {
   team: Team;
