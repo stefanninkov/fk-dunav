@@ -16,6 +16,7 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import {
@@ -23,7 +24,6 @@ import {
   isSupported as isMessagingSupported,
   type Messaging,
 } from 'firebase/messaging';
-import type { Auth } from 'firebase/auth';
 
 /**
  * Firebase config is read from Vite env vars (VITE_FIREBASE_*). The values
@@ -74,33 +74,24 @@ export const db: Firestore = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 
+export const auth: Auth = getAuth(firebaseApp);
 export const storage: FirebaseStorage = getStorage(firebaseApp);
 export const functions: Functions = getFunctions(firebaseApp, 'europe-west3');
 
 if (useEmulators) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
 }
 
 /**
- * Auth — lazy-loaded so the public site (which is anonymous-only) doesn't
- * download the 34 KB gzipped firebase/auth module. First call to
- * `getAuthInstance()` dynamically imports the module, returns a singleton
- * Auth instance, and (in emulator mode) wires the connection.
+ * Backwards-compatible promise wrapper. Earlier code paths used the
+ * lazy `getAuthInstance()` helper; we keep the signature so callers
+ * don't have to change, but it just resolves the eager `auth` export.
  */
-let authInstancePromise: Promise<Auth> | null = null;
-export function getAuthInstance(): Promise<Auth> {
-  if (authInstancePromise) return authInstancePromise;
-  authInstancePromise = (async () => {
-    const { getAuth, connectAuthEmulator } = await import('firebase/auth');
-    const auth = getAuth(firebaseApp);
-    if (useEmulators) {
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-    }
-    return auth;
-  })();
-  return authInstancePromise;
+export async function getAuthInstance(): Promise<Auth> {
+  return auth;
 }
 
 /**

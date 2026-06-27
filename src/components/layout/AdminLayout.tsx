@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 
 import logoUrl from '@/assets/logo.svg';
-import { getAuthInstance } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { sr } from '@/i18n/sr';
 import type { Capability } from '@/lib/firestore/types';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -97,10 +98,6 @@ export function AdminLayout() {
   }, [drawerOpen]);
 
   async function handleLogout() {
-    const [auth, { signOut }] = await Promise.all([
-      getAuthInstance(),
-      import('firebase/auth'),
-    ]);
     await signOut(auth);
     navigate('/admin/login', { replace: true });
   }

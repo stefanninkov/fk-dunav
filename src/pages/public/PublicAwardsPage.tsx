@@ -20,7 +20,6 @@ const tournamentAwardOrder: AwardId[] = [
   'mvp',
   'topScorer',
   'bestGoalkeeper',
-  'crossbarWinner',
 ];
 
 const PENDING = 'Uskoro';

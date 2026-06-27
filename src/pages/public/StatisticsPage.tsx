@@ -15,7 +15,6 @@ const awardOrder: AwardId[] = [
   'mvp',
   'topScorer',
   'bestGoalkeeper',
-  'crossbarWinner',
 ];
 
 /**

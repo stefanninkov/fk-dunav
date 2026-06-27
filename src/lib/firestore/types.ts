@@ -325,8 +325,7 @@ export type AwardId =
   | 'thirdPlace'
   | 'mvp'
   | 'topScorer'
-  | 'bestGoalkeeper'
-  | 'crossbarWinner';
+  | 'bestGoalkeeper';
 
 export type AwardEntityType = 'team' | 'player';
 
