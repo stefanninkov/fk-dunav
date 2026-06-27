@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 
-import { groupsCol, teamsCol } from '@/lib/firestore/refs';
-import type { Group, Team } from '@/lib/firestore/types';
+import { groupsCol, matchesCol, teamsCol } from '@/lib/firestore/refs';
+import type { Group, Match, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { GroupsPanel } from '@/features/team/components/GroupsPanel';
@@ -15,6 +15,7 @@ export function TeamsPage() {
   const active = useTournamentStore((s) => s.active);
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [teams, setTeams] = useState<Team[] | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
   const [editing, setEditing] = useState<Team | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +23,7 @@ export function TeamsPage() {
     if (!active) {
       setGroups(null);
       setTeams(null);
+      setMatches([]);
       return;
     }
     const unsubGroups = onSnapshot(
@@ -34,9 +36,15 @@ export function TeamsPage() {
       (snap) => setTeams(snap.docs.map((d) => d.data())),
       (e) => setError(e.message),
     );
+    // Matches feed the live-standings seed inside the reorder modal so
+    // it opens already in points + tiebreaker order.
+    const unsubMatches = onSnapshot(matchesCol(active.id), (snap) =>
+      setMatches(snap.docs.map((d) => d.data())),
+    );
     return () => {
       unsubGroups();
       unsubTeams();
+      unsubMatches();
     };
   }, [active]);
 
@@ -81,6 +89,8 @@ export function TeamsPage() {
         <TeamList
           teams={teams}
           groups={groups ?? []}
+          matches={matches}
+          tiebreakerOrder={active.config.tiebreakerOrder}
           tournamentId={active.id}
           onEdit={(team) => setEditing(team)}
         />

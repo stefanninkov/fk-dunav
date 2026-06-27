@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, GripVertical, ListOrdered, Pencil, X } from 'lucide-react';
 
-import type { Group, Team } from '@/lib/firestore/types';
+import type { Group, Match, Team, TiebreakerKey } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { softDeleteTeam, updateTeam } from '@/features/team/teamActions';
 import { deleteTeamRoster } from '@/features/player/playerActions';
 import { setGroupManualOrder } from '@/features/tournament/tournamentActions';
+import { computeStandings, sortStandings } from '@/lib/utils/standings';
 
 interface Props {
   tournamentId: string;
   teams: Team[];
   groups: Group[];
+  matches: Match[];
+  tiebreakerOrder: TiebreakerKey[];
   onEdit: (team: Team) => void;
 }
 
@@ -23,7 +26,14 @@ const DRAG_TYPE = 'application/x-fk-dunav-team';
  * Mobile users can still use Edit → group dropdown (native D&D is a
  * desktop-only convenience).
  */
-export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
+export function TeamList({
+  tournamentId,
+  teams,
+  groups,
+  matches,
+  tiebreakerOrder,
+  onEdit,
+}: Props) {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [orderingGroup, setOrderingGroup] = useState<Group | null>(null);
@@ -167,6 +177,8 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
           tournamentId={tournamentId}
           group={orderingGroup}
           teams={teams.filter((t) => t.groupId === orderingGroup.id)}
+          matches={matches}
+          tiebreakerOrder={tiebreakerOrder}
           onClose={() => setOrderingGroup(null)}
         />
       ) : null}
@@ -175,32 +187,42 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
 }
 
 /**
- * Up/Down reorder list for a single group. Initial order seeds from the
- * group's existing manualOrder (if any), else from the team list as
- * given. Save writes `Group.manualOrder`; Reset clears it back to
- * auto sort.
+ * Up/Down reorder list for a single group. Seeds from the live computed
+ * standings — i.e. exactly what the public /grupe table is showing
+ * right now (points + tiebreakers + existing manualOrder if any). The
+ * admin tweaks from there. Save writes `Group.manualOrder`; Auto-sort
+ * clears the override back to pure auto.
  */
 function GroupOrderModal({
   tournamentId,
   group,
   teams,
+  matches,
+  tiebreakerOrder,
   onClose,
 }: {
   tournamentId: string;
   group: Group;
   teams: Team[];
+  matches: Match[];
+  tiebreakerOrder: TiebreakerKey[];
   onClose: () => void;
 }) {
+  const liveRows = (() => {
+    const raw = computeStandings({ teams, matches });
+    return sortStandings({
+      standings: raw,
+      matches,
+      order: tiebreakerOrder,
+      manualOrder: group.manualOrder,
+    });
+  })();
+  const statsByTeam = new Map(liveRows.map((r) => [r.teamId, r]));
   const initial: Team[] = (() => {
-    if (group.manualOrder?.length) {
-      const byId = new Map(teams.map((t) => [t.id, t]));
-      const ordered = group.manualOrder
-        .map((id) => byId.get(id))
-        .filter((t): t is Team => !!t);
-      const remaining = teams.filter((t) => !group.manualOrder?.includes(t.id));
-      return [...ordered, ...remaining];
-    }
-    return teams;
+    const byId = new Map(teams.map((t) => [t.id, t]));
+    return liveRows
+      .map((r) => byId.get(r.teamId))
+      .filter((t): t is Team => !!t);
   })();
   const [order, setOrder] = useState<Team[]>(initial);
   const [busy, setBusy] = useState(false);
@@ -276,35 +298,46 @@ function GroupOrderModal({
         </header>
 
         <ol className="flex flex-col gap-2 px-3 py-3">
-          {order.map((t, i) => (
-            <li
-              key={t.id}
-              className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2"
-            >
-              <span className="tnum w-6 text-sm font-700 text-ink-secondary">
-                {i + 1}.
-              </span>
-              <span className="flex-1 truncate text-sm text-ink-primary">{t.name}</span>
-              <button
-                type="button"
-                onClick={() => move(i, -1)}
-                disabled={busy || i === 0}
-                className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
-                aria-label="Pomeri gore"
+          {order.map((t, i) => {
+            const stats = statsByTeam.get(t.id);
+            return (
+              <li
+                key={t.id}
+                className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2"
               >
-                <ArrowUp size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => move(i, 1)}
-                disabled={busy || i === order.length - 1}
-                className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
-                aria-label="Pomeri dole"
-              >
-                <ArrowDown size={16} />
-              </button>
-            </li>
-          ))}
+                <span className="tnum w-6 text-sm font-700 text-ink-secondary">
+                  {i + 1}.
+                </span>
+                <span className="flex-1 truncate text-sm text-ink-primary">{t.name}</span>
+                {stats ? (
+                  <span className="tnum text-xs text-ink-tertiary">
+                    {stats.points} bod · GR{' '}
+                    {stats.goalDifference > 0
+                      ? `+${stats.goalDifference}`
+                      : stats.goalDifference}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => move(i, -1)}
+                  disabled={busy || i === 0}
+                  className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
+                  aria-label="Pomeri gore"
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(i, 1)}
+                  disabled={busy || i === order.length - 1}
+                  className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
+                  aria-label="Pomeri dole"
+                >
+                  <ArrowDown size={16} />
+                </button>
+              </li>
+            );
+          })}
         </ol>
 
         {error ? (
