@@ -88,16 +88,21 @@ export function computeStandings(params: {
  * H2H (head-to-head) resolves ties between exactly two teams by looking
  * at the match(es) they played against each other; ties among 3+ teams
  * on H2H fall through to the next tiebreaker.
+ *
+ * `manualOrder` (optional) is an admin override: a list of teamIds in
+ * the desired final order. Teams that appear in it take that order;
+ * any standings rows not listed fall to the bottom in autosort order.
  */
 export function sortStandings(params: {
   standings: StandingRow[];
   matches: Match[];
   order: TiebreakerKey[];
+  manualOrder?: string[];
 }): StandingRow[] {
-  const { standings, matches, order } = params;
+  const { standings, matches, order, manualOrder } = params;
   const finishedGroup = matches.filter((m) => m.status === 'finished' && m.phase === 'group');
 
-  const sorted = [...standings].sort((x, y) => {
+  const auto = [...standings].sort((x, y) => {
     if (x.points !== y.points) return y.points - x.points;
     for (const key of order) {
       const cmp = compareByKey(x, y, key, finishedGroup);
@@ -105,6 +110,19 @@ export function sortStandings(params: {
     }
     return x.teamName.localeCompare(y.teamName, 'sr');
   });
+
+  let sorted = auto;
+  if (manualOrder && manualOrder.length > 0) {
+    const indexOf = new Map(manualOrder.map((id, i) => [id, i]));
+    sorted = [...auto].sort((x, y) => {
+      const xi = indexOf.get(x.teamId);
+      const yi = indexOf.get(y.teamId);
+      if (xi !== undefined && yi !== undefined) return xi - yi;
+      if (xi !== undefined) return -1;
+      if (yi !== undefined) return 1;
+      return 0;
+    });
+  }
 
   sorted.forEach((row, idx) => {
     row.rank = idx + 1;

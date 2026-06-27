@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { GripVertical, Pencil } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, ListOrdered, Pencil, X } from 'lucide-react';
 
 import type { Group, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { softDeleteTeam, updateTeam } from '@/features/team/teamActions';
 import { deleteTeamRoster } from '@/features/player/playerActions';
+import { setGroupManualOrder } from '@/features/tournament/tournamentActions';
 
 interface Props {
   tournamentId: string;
@@ -25,6 +26,7 @@ const DRAG_TYPE = 'application/x-fk-dunav-team';
 export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [orderingGroup, setOrderingGroup] = useState<Group | null>(null);
 
   if (teams.length === 0) {
     return (
@@ -120,7 +122,25 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
             className={`flex flex-col gap-2 ${dropZoneCls(g.id)}`}
             {...dropProps(g.id)}
           >
-            <h3 className="font-display text-sm font-600 text-ink-secondary">{g.name}</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display text-sm font-600 text-ink-secondary">{g.name}</h3>
+              {list.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setOrderingGroup(g)}
+                  className="inline-flex items-center gap-1 rounded-md border border-surface-4 px-2 py-1 text-xs text-ink-secondary hover:bg-surface-2 hover:text-ink-primary"
+                  title="Postavi konačan redosled u tabeli"
+                >
+                  <ListOrdered size={14} />
+                  Redosled u tabeli
+                  {g.manualOrder?.length ? (
+                    <span className="ml-1 rounded-full bg-brand-600/20 px-1.5 text-[0.65rem] font-700 text-brand-300">
+                      ručno
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
+            </div>
             {list.length === 0 ? (
               <p className="rounded-md bg-surface-1 px-4 py-3 text-xs text-ink-tertiary">
                 Prevuci tim ovde.
@@ -141,6 +161,177 @@ export function TeamList({ tournamentId, teams, groups, onEdit }: Props) {
           </section>
         );
       })}
+
+      {orderingGroup ? (
+        <GroupOrderModal
+          tournamentId={tournamentId}
+          group={orderingGroup}
+          teams={teams.filter((t) => t.groupId === orderingGroup.id)}
+          onClose={() => setOrderingGroup(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Up/Down reorder list for a single group. Initial order seeds from the
+ * group's existing manualOrder (if any), else from the team list as
+ * given. Save writes `Group.manualOrder`; Reset clears it back to
+ * auto sort.
+ */
+function GroupOrderModal({
+  tournamentId,
+  group,
+  teams,
+  onClose,
+}: {
+  tournamentId: string;
+  group: Group;
+  teams: Team[];
+  onClose: () => void;
+}) {
+  const initial: Team[] = (() => {
+    if (group.manualOrder?.length) {
+      const byId = new Map(teams.map((t) => [t.id, t]));
+      const ordered = group.manualOrder
+        .map((id) => byId.get(id))
+        .filter((t): t is Team => !!t);
+      const remaining = teams.filter((t) => !group.manualOrder?.includes(t.id));
+      return [...ordered, ...remaining];
+    }
+    return teams;
+  })();
+  const [order, setOrder] = useState<Team[]>(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function move(idx: number, delta: number) {
+    const j = idx + delta;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setOrder(next);
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await setGroupManualOrder(
+        tournamentId,
+        group.id,
+        order.map((t) => t.id),
+      );
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reset() {
+    setBusy(true);
+    setError(null);
+    try {
+      await setGroupManualOrder(tournamentId, group.id, null);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+              Redosled u tabeli
+            </span>
+            <span className="font-display text-base font-700 text-ink-primary">
+              {group.name}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <ol className="flex flex-col gap-2 px-3 py-3">
+          {order.map((t, i) => (
+            <li
+              key={t.id}
+              className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2"
+            >
+              <span className="tnum w-6 text-sm font-700 text-ink-secondary">
+                {i + 1}.
+              </span>
+              <span className="flex-1 truncate text-sm text-ink-primary">{t.name}</span>
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={busy || i === 0}
+                className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
+                aria-label="Pomeri gore"
+              >
+                <ArrowUp size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={busy || i === order.length - 1}
+                className="rounded-md p-2 text-ink-secondary hover:bg-surface-3 disabled:opacity-40"
+                aria-label="Pomeri dole"
+              >
+                <ArrowDown size={16} />
+              </button>
+            </li>
+          ))}
+        </ol>
+
+        {error ? (
+          <p className="mx-4 mb-2 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => void reset()}
+            disabled={busy || !group.manualOrder?.length}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2 disabled:opacity-60"
+          >
+            Auto-sort
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

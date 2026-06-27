@@ -73,6 +73,13 @@ export interface Group {
   name: string;
   order: number;
   createdAt: Timestamp;
+  /**
+   * Optional admin override for the final standings order in this group.
+   * When set, the public Grupe table renders teams in this teamId order
+   * regardless of points + tiebreakers. Used to fix odd tiebreaker
+   * outcomes that the autosort logic doesn't capture cleanly.
+   */
+  manualOrder?: string[];
 }
 
 // ---------------------------------------------------------------------------

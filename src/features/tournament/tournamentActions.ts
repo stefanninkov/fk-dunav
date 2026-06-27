@@ -1,5 +1,6 @@
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDocs,
   query,
@@ -166,4 +167,19 @@ export async function deleteGroup(
   groupId: string,
 ): Promise<void> {
   await deleteDoc(groupDoc(tournamentId, groupId));
+}
+
+/**
+ * Admin override of the group's final-standings order. Pass an array of
+ * teamIds in the desired order; pass null to clear and fall back to
+ * auto sort (points + tiebreakers).
+ */
+export async function setGroupManualOrder(
+  tournamentId: string,
+  groupId: string,
+  manualOrder: string[] | null,
+): Promise<void> {
+  await updateDoc(groupDoc(tournamentId, groupId), {
+    manualOrder: manualOrder ?? deleteField(),
+  });
 }

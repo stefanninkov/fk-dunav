@@ -48,6 +48,7 @@ export function GroupsPage() {
           standings: raw,
           matches,
           order: active.config.tiebreakerOrder,
+          manualOrder: g.manualOrder,
         }),
       };
     });
