@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 
 import {
   matchDoc,
@@ -351,102 +351,204 @@ function TeamPanel({
   onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
 }) {
   const team = side === 'a' ? match.teamA : match.teamB;
-  const [pickedId, setPickedId] = useState<string>('');
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setSheetOpen(true)}
+        className="flex h-full min-h-[5rem] flex-col items-start justify-center gap-1 rounded-lg bg-surface-1 p-4 text-left shadow-card transition-colors active:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="text-xs uppercase tracking-wide text-ink-tertiary">
+          {disabled ? 'Tim' : 'Klikni za događaj'}
+        </span>
+        <span className="font-display text-base font-700 text-ink-primary sm:text-lg">
+          {team.name}
+        </span>
+        <span className="text-xs text-ink-tertiary">
+          ⚽ gol · 🟨 karton · 🟥 karton
+        </span>
+      </button>
+
+      {sheetOpen ? (
+        <PlayerActionSheet
+          teamName={team.name}
+          players={players}
+          onClose={() => setSheetOpen(false)}
+          onGoal={(p) => {
+            onGoal(p);
+            setSheetOpen(false);
+          }}
+          onCard={(type, p) => {
+            onCard(type, p);
+            setSheetOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Bottom-sheet roster picker. One row per player with three quick-tap
+ * action buttons — Goal / Yellow / Red. A "Drugi (unesi ručno)" footer
+ * row lets the reporter log an event for an off-roster player without
+ * leaving the sheet.
+ */
+function PlayerActionSheet({
+  teamName,
+  players,
+  onClose,
+  onGoal,
+  onCard,
+}: {
+  teamName: string;
+  players: Player[];
+  onClose: () => void;
+  onGoal: (player: PickedPlayer) => void;
+  onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
+}) {
+  const [otherOpen, setOtherOpen] = useState(false);
   const [otherName, setOtherName] = useState('');
 
-  function pickedPlayer(): PickedPlayer | null {
-    if (pickedId === 'other') {
-      const trimmed = otherName.trim();
-      if (!trimmed) return null;
-      return { name: trimmed };
-    }
-    if (pickedId) {
-      const p = players.find((x) => x.id === pickedId);
-      if (!p) return null;
-      return { id: p.id, name: p.displayName };
-    }
-    return null;
-  }
-
-  function reset() {
-    setPickedId('');
+  function commitOther(kind: 'goal' | 'yellow' | 'red') {
+    const trimmed = otherName.trim();
+    if (!trimmed) return;
+    const picked: PickedPlayer = { name: trimmed };
+    if (kind === 'goal') onGoal(picked);
+    else if (kind === 'yellow') onCard('yellowCard', picked);
+    else onCard('redCard', picked);
     setOtherName('');
+    setOtherOpen(false);
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-surface-1 p-4 shadow-card">
-      <h3 className="font-display text-sm font-600 text-ink-secondary">{team.name}</h3>
-
-      <select
-        value={pickedId}
-        onChange={(e) => setPickedId(e.target.value)}
-        className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
-        disabled={disabled}
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <option value="">— Izaberi igrača —</option>
-        {players.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.displayName}
-          </option>
-        ))}
-        <option value="other">Drugi (unesi ručno)</option>
-      </select>
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+              {sr.match.actions.addGoal} · karton
+            </span>
+            <span className="font-display text-base font-700 text-ink-primary">
+              {teamName}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
 
-      {pickedId === 'other' ? (
-        <input
-          placeholder="Ime i prezime"
-          value={otherName}
-          onChange={(e) => setOtherName(e.target.value)}
-          className="h-touch rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
-          disabled={disabled}
-        />
-      ) : null}
+        <ul className="flex-1 overflow-y-auto px-3 py-3">
+          {players.length === 0 ? (
+            <li className="rounded-md bg-surface-2 px-3 py-4 text-center text-sm italic text-ink-tertiary">
+              Nema igrača u rosteru. Koristi <strong>Drugi</strong> ispod.
+            </li>
+          ) : (
+            players.map((p) => {
+              const picked: PickedPlayer = { id: p.id, name: p.displayName };
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-2 border-b border-surface-3 py-2 last:border-b-0"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-primary">
+                    {p.displayName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onGoal(picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary active:bg-brand-500"
+                  >
+                    ⚽
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCard('yellowCard', picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-warning-soft px-3 text-sm font-700 text-warning active:opacity-90"
+                    aria-label="Žuti karton"
+                  >
+                    🟨
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCard('redCard', picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-danger-soft px-3 text-sm font-700 text-danger active:opacity-90"
+                    aria-label="Crveni karton"
+                  >
+                    🟥
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={disabled || !pickedPlayer()}
-          onClick={() => {
-            const p = pickedPlayer();
-            if (p) {
-              onGoal(p);
-              reset();
-            }
-          }}
-          className="h-touch min-w-[6rem] flex-1 rounded-md bg-brand-600 px-4 font-700 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
-        >
-          ⚽ {sr.match.actions.addGoal}
-        </button>
-        <button
-          type="button"
-          disabled={disabled || !pickedPlayer()}
-          onClick={() => {
-            const p = pickedPlayer();
-            if (p) {
-              onCard('yellowCard', p);
-              reset();
-            }
-          }}
-          className="h-touch min-w-[3.5rem] rounded-md bg-warning-soft px-4 font-600 text-warning disabled:opacity-60"
-          aria-label="Žuti karton"
-        >
-          🟨
-        </button>
-        <button
-          type="button"
-          disabled={disabled || !pickedPlayer()}
-          onClick={() => {
-            const p = pickedPlayer();
-            if (p) {
-              onCard('redCard', p);
-              reset();
-            }
-          }}
-          className="h-touch min-w-[3.5rem] rounded-md bg-danger-soft px-4 font-600 text-danger disabled:opacity-60"
-          aria-label="Crveni karton"
-        >
-          🟥
-        </button>
+        <div className="border-t border-surface-3 px-3 py-3">
+          {otherOpen ? (
+            <div className="flex flex-col gap-2">
+              <input
+                value={otherName}
+                onChange={(e) => setOtherName(e.target.value)}
+                placeholder="Ime i prezime"
+                autoFocus
+                className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('goal')}
+                  className="h-touch flex-1 rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary disabled:opacity-60"
+                >
+                  ⚽ {sr.match.actions.addGoal}
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('yellow')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-warning-soft px-3 text-sm font-700 text-warning disabled:opacity-60"
+                  aria-label="Žuti karton"
+                >
+                  🟨
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('red')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-danger-soft px-3 text-sm font-700 text-danger disabled:opacity-60"
+                  aria-label="Crveni karton"
+                >
+                  🟥
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setOtherOpen(true)}
+              className="h-touch w-full rounded-md border border-dashed border-surface-4 text-sm text-ink-secondary hover:bg-surface-2"
+            >
+              + Drugi (unesi ručno)
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
