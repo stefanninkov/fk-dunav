@@ -207,30 +207,30 @@ export function AdminMatchEditorPage() {
 
       <section className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-1 p-4 shadow-card">
         {match.status === 'scheduled' ? (
-          <>
-            <Btn busy={busy} onClick={() => act(() => startMatch(active.id, match.id, uid))}>
-              {sr.match.actions.start}
-            </Btn>
-            <Btn
-              variant="ghost"
-              busy={busy}
-              onClick={() => {
-                const choice = prompt(
-                  `Predaja meča — koji tim nije došao?\n\nUkucaj "a" za "${match.teamA.name}" (gubi 0:3) ili "b" za "${match.teamB.name}" (gubi 3:0).`,
-                );
-                if (!choice) return;
-                const c = choice.trim().toLowerCase();
-                if (c !== 'a' && c !== 'b') return;
-                const winnerSide: 'a' | 'b' = c === 'a' ? 'b' : 'a';
-                const winnerName =
-                  winnerSide === 'a' ? match.teamA.name : match.teamB.name;
-                if (!confirm(`Potvrdi predaju: pobednik ${winnerName} 3:0?`)) return;
-                void act(() => forfeitMatch(active.id, match.id, uid, winnerSide));
-              }}
-            >
-              Predaja meča
-            </Btn>
-          </>
+          <Btn busy={busy} onClick={() => act(() => startMatch(active.id, match.id, uid))}>
+            {sr.match.actions.start}
+          </Btn>
+        ) : null}
+        {match.status === 'scheduled' || match.forfeit ? (
+          <Btn
+            variant="ghost"
+            busy={busy}
+            onClick={() => {
+              const choice = prompt(
+                `Predaja meča — koji tim nije došao?\n\nUkucaj "a" za "${match.teamA.name}" (gubi 0:3) ili "b" za "${match.teamB.name}" (gubi 3:0).`,
+              );
+              if (!choice) return;
+              const c = choice.trim().toLowerCase();
+              if (c !== 'a' && c !== 'b') return;
+              const winnerSide: 'a' | 'b' = c === 'a' ? 'b' : 'a';
+              const winnerName =
+                winnerSide === 'a' ? match.teamA.name : match.teamB.name;
+              if (!confirm(`Potvrdi predaju: pobednik ${winnerName} 3:0?`)) return;
+              void act(() => forfeitMatch(active.id, match.id, uid, winnerSide));
+            }}
+          >
+            {match.forfeit ? 'Ispravi predaju' : 'Predaja meča'}
+          </Btn>
         ) : null}
 
         {match.status === 'live' && match.clock.state === 'running' ? (

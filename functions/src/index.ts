@@ -40,11 +40,22 @@ export const recomputeMatchScore = functions
       tournamentId: string;
       matchId: string;
     };
-    const eventsSnap = await db
+
+    const matchRef = db
       .collection('tournaments')
       .doc(tournamentId)
       .collection('matches')
-      .doc(matchId)
+      .doc(matchId);
+
+    // Forfeits ("predaja meča") have an authoritative 3:0/0:3 stamped
+    // by the client. They never have goal events, so the recompute
+    // below would clobber the official score back to 0:0. Skip.
+    const matchSnap = await matchRef.get();
+    if (matchSnap.exists && matchSnap.data()?.forfeit === true) {
+      return;
+    }
+
+    const eventsSnap = await matchRef
       .collection('events')
       .where('deleted', '==', false)
       .get();
@@ -58,16 +69,11 @@ export const recomputeMatchScore = functions
       else if (ev.team === 'b') b += 1;
     }
 
-    await db
-      .collection('tournaments')
-      .doc(tournamentId)
-      .collection('matches')
-      .doc(matchId)
-      .update({
-        'score.a': a,
-        'score.b': b,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+    await matchRef.update({
+      'score.a': a,
+      'score.b': b,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
   });
 
 // ---------------------------------------------------------------------------

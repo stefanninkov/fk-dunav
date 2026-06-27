@@ -238,9 +238,10 @@ export async function endMatch(
 
 /**
  * Forfeit ("predaja"): one side didn't show up so the present side
- * walks away with a 3:0 official scoreline. Used from the editor when
- * the opponent is a no-show — no clock, no events, just stamp a final
- * score and close out the match.
+ * walks away with a 3:0 official scoreline. Stamps a final score and
+ * closes out the match — NO matchEnd event written, because the
+ * `recomputeMatchScore` Cloud Function would otherwise see zero goal
+ * events and clobber the score back to 0:0.
  */
 export async function forfeitMatch(
   tournamentId: string,
@@ -249,9 +250,8 @@ export async function forfeitMatch(
   winnerSide: 'a' | 'b',
 ): Promise<void> {
   const ref = matchDoc(tournamentId, matchId);
-  const batch = writeBatch(db);
   const score = winnerSide === 'a' ? { a: 3, b: 0 } : { a: 0, b: 3 };
-  batch.update(ref, {
+  await updateDoc(ref, {
     status: 'finished',
     score,
     forfeit: true,
@@ -263,12 +263,6 @@ export async function forfeitMatch(
     updatedAt: serverTimestamp(),
     updatedBy: uid,
   });
-  await appendEventBatch(batch, tournamentId, matchId, {
-    type: 'matchEnd',
-    minute: 0,
-    createdBy: uid,
-  });
-  await batch.commit();
 }
 
 export async function abandonMatch(
