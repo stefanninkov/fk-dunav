@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { sr } from '@/i18n/sr';
+import { useTournamentStarted } from '@/hooks/useTournamentStarted';
 import { awardsPaths, resultsPaths } from './publicNav';
 
 /**
@@ -22,30 +23,56 @@ import { awardsPaths, resultsPaths } from './publicNav';
  * with primary navigation for thumb real estate.
  */
 
-const primary: {
+interface PrimaryTab {
   to: string;
   label: string;
   icon: typeof Home;
-  // Highlight when ANY of these paths is active (for group tabs).
+  /** Highlight when ANY of these paths is active (for group tabs). */
   matchPaths?: Set<string>;
-}[] = [
-  { to: '/', label: sr.nav.home, icon: Home },
-  { to: '/grupe', label: sr.nav.group.results, icon: ListOrdered, matchPaths: resultsPaths },
-  { to: '/nagrade', label: sr.nav.group.awards, icon: Award, matchPaths: awardsPaths },
-  { to: '/galerija', label: sr.nav.gallery, icon: ImageIcon },
-];
+}
 
-const moreLinks: { to: string; label: string }[] = [
-  { to: '/statistika', label: sr.nav.statistics },
-  { to: '/sponzori', label: sr.nav.sponsors },
-  { to: '/pravilnik', label: sr.nav.rules },
-  { to: '/o-turniru', label: sr.nav.about },
-  { to: '/sampioni', label: sr.nav.champions },
-];
+/**
+ * The leftmost slot swaps once the countdown is done. Pre-tournament
+ * "Početna" leads to the hero + Countdown; after kickoff the same slot
+ * is the Rezultati landing so visitors don't have to hunt for live
+ * standings.
+ */
+function primaryTabs(started: boolean): PrimaryTab[] {
+  if (started) {
+    return [
+      { to: '/grupe', label: sr.nav.group.results, icon: ListOrdered, matchPaths: resultsPaths },
+      { to: '/nagrade', label: sr.nav.group.awards, icon: Award, matchPaths: awardsPaths },
+      { to: '/galerija', label: sr.nav.gallery, icon: ImageIcon },
+      { to: '/statistika', label: sr.nav.statistics, icon: Home },
+    ];
+  }
+  return [
+    { to: '/', label: sr.nav.home, icon: Home },
+    { to: '/grupe', label: sr.nav.group.results, icon: ListOrdered, matchPaths: resultsPaths },
+    { to: '/nagrade', label: sr.nav.group.awards, icon: Award, matchPaths: awardsPaths },
+    { to: '/galerija', label: sr.nav.gallery, icon: ImageIcon },
+  ];
+}
+
+function moreLinksFor(started: boolean): { to: string; label: string }[] {
+  const links = [
+    { to: '/statistika', label: sr.nav.statistics },
+    { to: '/sponzori', label: sr.nav.sponsors },
+    { to: '/pravilnik', label: sr.nav.rules },
+    { to: '/o-turniru', label: sr.nav.about },
+    { to: '/sampioni', label: sr.nav.champions },
+  ];
+  // Statistika is promoted to a primary tab once the tournament is live
+  // (it's the post-match deep-dive most visitors hit). Strip the dup.
+  return started ? links.filter((l) => l.to !== '/statistika') : links;
+}
 
 export function MobileBottomNav() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const location = useLocation();
+  const started = useTournamentStarted();
+  const primary = primaryTabs(started);
+  const moreLinks = moreLinksFor(started);
 
   // Close the "more" sheet when the route changes.
   useEffect(() => setSheetOpen(false), [location.pathname]);
@@ -74,7 +101,7 @@ export function MobileBottomNav() {
       </nav>
 
       {sheetOpen ? (
-        <MoreSheet onClose={() => setSheetOpen(false)} />
+        <MoreSheet links={moreLinks} onClose={() => setSheetOpen(false)} />
       ) : null}
     </>
   );
@@ -112,7 +139,13 @@ function BottomTab({
   );
 }
 
-function MoreSheet({ onClose }: { onClose: () => void }) {
+function MoreSheet({
+  links,
+  onClose,
+}: {
+  links: { to: string; label: string }[];
+  onClose: () => void;
+}) {
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-surface-0/95 backdrop-blur lg:hidden"
@@ -131,7 +164,7 @@ function MoreSheet({ onClose }: { onClose: () => void }) {
         </button>
       </header>
       <ul className="flex-1 overflow-y-auto p-2">
-        {moreLinks.map((l) => (
+        {links.map((l) => (
           <li key={l.to}>
             <NavLink
               to={l.to}

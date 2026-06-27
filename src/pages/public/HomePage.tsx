@@ -1,16 +1,20 @@
-import { NavLink } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 
 import { sr } from '@/i18n/sr';
 import { Countdown } from '@/features/home/Countdown';
+import { useTournamentStarted } from '@/hooks/useTournamentStarted';
 
 const TOURNAMENT_START = new Date('2026-06-27T10:00:00+02:00');
-const TOURNAMENT_END_WINDOW_MS = 48 * 3_600_000;
 
 export function HomePage() {
-  const now = new Date();
-  const isLive =
-    now >= TOURNAMENT_START &&
-    now <= new Date(TOURNAMENT_START.getTime() + TOURNAMENT_END_WINDOW_MS);
+  const started = useTournamentStarted();
+
+  // Once the countdown has fired, the home page is no longer the most
+  // useful landing — drop visitors straight onto Rezultati where the
+  // live group standings + match schedule live.
+  if (started) {
+    return <Navigate to="/rezultati" replace />;
+  }
 
   return (
     <section className="relative overflow-hidden">
@@ -28,24 +32,13 @@ export function HomePage() {
           {sr.brand.tagline}
         </p>
 
-        {isLive ? (
-          <NavLink
-            to="/uzivo"
-            className="mt-8 inline-flex h-touch items-center gap-2 rounded-md bg-live px-5 font-600 text-ink-primary shadow-glow"
-          >
-            <span className="h-2 w-2 animate-pulse rounded-full bg-ink-primary" />
-            {sr.nav.live}
-          </NavLink>
-        ) : (
-          <div className="mt-8 flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-wide text-ink-tertiary">
-              Do početka turnira
-            </span>
-            <Countdown target={TOURNAMENT_START} />
-          </div>
-        )}
+        <div className="mt-8 flex flex-col gap-3">
+          <span className="text-xs uppercase tracking-wide text-ink-tertiary">
+            Do početka turnira
+          </span>
+          <Countdown target={TOURNAMENT_START} />
+        </div>
       </div>
     </section>
   );
 }
-
