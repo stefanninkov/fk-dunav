@@ -67,14 +67,24 @@ function LiveMatchCard({
   const [goals, setGoals] = useState<MatchEvent[]>([]);
 
   useEffect(() => {
+    // Same query shape as MatchDetailPage so we hit the auto-generated
+    // subcollection index. Adding where('type', '==', 'goal') here
+    // would require a (type, deleted, minute) composite index that
+    // isn't deployed, and onSnapshot would silently swallow the
+    // FAILED_PRECONDITION — which is exactly why scorers never showed.
     const unsub = onSnapshot(
       query(
         matchEventsCol(tournamentId, match.id),
-        where('type', '==', 'goal'),
         where('deleted', '==', false),
         orderBy('minute', 'asc'),
       ),
-      (snap) => setGoals(snap.docs.map((d) => d.data())),
+      (snap) => {
+        const all = snap.docs.map((d) => d.data());
+        setGoals(all.filter((e) => e.type === 'goal'));
+      },
+      (err) => {
+        console.error('LiveMatchCard goal subscription failed', err);
+      },
     );
     return unsub;
   }, [tournamentId, match.id]);
