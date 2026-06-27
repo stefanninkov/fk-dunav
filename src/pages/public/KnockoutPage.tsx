@@ -203,8 +203,16 @@ export function KnockoutPage() {
         standings: raw,
         matches,
         order: active.config.tiebreakerOrder,
+        // Honour the admin's manual override so the QF slots pair up
+        // teams in the same order the public /grupe table is showing.
+        manualOrder: g.manualOrder,
       });
-      const lockedRanks = computeLockedRanks(sorted, matches, g.id);
+      // If the admin pinned a manual order, they've effectively declared
+      // the standings final — every rank is locked, so the team names
+      // appear in the bracket slots immediately instead of "1A"/"2A".
+      const lockedRanks = g.manualOrder?.length
+        ? new Set(sorted.map((r) => r.rank))
+        : computeLockedRanks(sorted, matches, g.id);
       m.set(letterForGroup(g), { standings: sorted, lockedRanks });
     }
     return m;
