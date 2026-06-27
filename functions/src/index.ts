@@ -48,10 +48,13 @@ export const recomputeMatchScore = functions
       .doc(matchId);
 
     // Forfeits ("predaja meča") have an authoritative 3:0/0:3 stamped
-    // by the client. They never have goal events, so the recompute
-    // below would clobber the official score back to 0:0. Skip.
+    // by the client; manualScore matches were patched in by an admin
+    // because the events log was wrong. Neither should be recomputed
+    // from goal events — that would clobber the official score back
+    // to whatever the (possibly empty) event log adds up to.
     const matchSnap = await matchRef.get();
-    if (matchSnap.exists && matchSnap.data()?.forfeit === true) {
+    const matchData = matchSnap.exists ? matchSnap.data() : null;
+    if (matchData?.forfeit === true || matchData?.manualScore === true) {
       return;
     }
 

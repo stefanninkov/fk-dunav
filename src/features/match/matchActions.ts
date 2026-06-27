@@ -237,6 +237,26 @@ export async function endMatch(
 }
 
 /**
+ * Override the cached score directly. Used when the events log is wrong
+ * (reporter forgot to log goals, etc.) or to fix a stuck 0:0 final.
+ * Sets `manualScore: true` so the `recomputeMatchScore` Cloud Function
+ * leaves the doc alone going forward.
+ */
+export async function setMatchScore(
+  tournamentId: string,
+  matchId: string,
+  uid: string,
+  score: { a: number; b: number },
+): Promise<void> {
+  await updateDoc(matchDoc(tournamentId, matchId), {
+    score,
+    manualScore: true,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+}
+
+/**
  * Forfeit ("predaja"): one side didn't show up so the present side
  * walks away with a 3:0 official scoreline. Stamps a final score and
  * closes out the match — NO matchEnd event written, because the

@@ -22,6 +22,7 @@ import {
   logGoal,
   pauseMatch,
   resumeMatch,
+  setMatchScore,
   softDeleteEvent,
   startMatch,
   startSecondHalf,
@@ -47,6 +48,7 @@ export function AdminMatchEditorPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shootoutOpen, setShootoutOpen] = useState(false);
+  const [scoreEditOpen, setScoreEditOpen] = useState(false);
 
   useEffect(() => {
     if (!active || !matchId) return;
@@ -233,6 +235,12 @@ export function AdminMatchEditorPage() {
           </Btn>
         ) : null}
 
+        {match.status === 'live' || match.status === 'finished' ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setScoreEditOpen(true)}>
+            Ispravi rezultat
+          </Btn>
+        ) : null}
+
         {match.status === 'live' && match.clock.state === 'running' ? (
           <>
             <Btn
@@ -315,6 +323,17 @@ export function AdminMatchEditorPage() {
           uid={uid}
           displayMinute={displayMinute}
           onClose={() => setShootoutOpen(false)}
+        />
+      ) : null}
+
+      {scoreEditOpen ? (
+        <ScoreEditModal
+          match={match}
+          onClose={() => setScoreEditOpen(false)}
+          onSave={(score) => {
+            setScoreEditOpen(false);
+            void act(() => setMatchScore(active.id, match.id, uid, score));
+          }}
         />
       ) : null}
 
@@ -593,6 +612,106 @@ function PlayerActionSheet({
               + Drugi (unesi ručno)
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Manual score override. Two number inputs, Save calls setMatchScore
+ * which stamps `manualScore: true` so the Cloud Function leaves the
+ * doc alone going forward.
+ */
+function ScoreEditModal({
+  match,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  onClose: () => void;
+  onSave: (score: { a: number; b: number }) => void;
+}) {
+  const [a, setA] = useState(String(match.score.a));
+  const [b, setB] = useState(String(match.score.b));
+
+  const aNum = Number.parseInt(a, 10);
+  const bNum = Number.parseInt(b, 10);
+  const valid =
+    Number.isFinite(aNum) && Number.isFinite(bNum) && aNum >= 0 && bNum >= 0;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <span className="font-display text-base font-700 text-ink-primary">
+            Ispravi rezultat
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex items-end justify-between gap-3 px-4 py-5">
+          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-secondary">
+            <span className="truncate">{match.teamA.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={a}
+              onChange={(e) => setA(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+          <span className="pb-3 text-2xl text-ink-tertiary">:</span>
+          <label className="flex flex-1 flex-col gap-1 text-right text-xs text-ink-secondary">
+            <span className="truncate">{match.teamB.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+        </div>
+
+        <p className="px-4 pb-3 text-xs text-ink-tertiary">
+          Strelci se ne menjaju — ovo postavlja samo prikazani rezultat.
+        </p>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => onSave({ a: aNum, b: bNum })}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
         </div>
       </div>
     </div>

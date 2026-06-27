@@ -152,6 +152,7 @@ export interface Match {
   shootoutScore?: { a: number; b: number };
   forfeit?: boolean;
   forfeitWinner?: 'a' | 'b';
+  manualScore?: boolean;
 
   status: MatchStatus;
   clock: MatchClock;
