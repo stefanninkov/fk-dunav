@@ -7,6 +7,7 @@ import type { Group, Match, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import {
+  computeLockedRanks,
   computeStandings,
   sortStandings,
   type StandingRow,
@@ -186,10 +187,14 @@ export function KnockoutPage() {
     };
   }, [active]);
 
-  // Per-group standings, keyed by group letter (A, B, …). Group letter
-  // comes from the group's `order` index — 0 → A, 1 → B, etc.
-  const standingsByLetter = useMemo(() => {
-    const m = new Map<string, StandingRow[]>();
+  // Per-group standings + the set of rank positions that are
+  // mathematically locked given remaining matches. Keyed by group letter
+  // (A, B, …) — group letter comes from group.order (0 → A, 1 → B, …).
+  const groupInfoByLetter = useMemo(() => {
+    const m = new Map<
+      string,
+      { standings: StandingRow[]; lockedRanks: Set<number> }
+    >();
     if (!active || matches === null) return m;
     for (const g of groups) {
       const groupTeams = teams.filter((t) => !t.deletedAt && t.groupId === g.id);
@@ -199,8 +204,8 @@ export function KnockoutPage() {
         matches,
         order: active.config.tiebreakerOrder,
       });
-      const letter = letterForGroup(g);
-      m.set(letter, sorted);
+      const lockedRanks = computeLockedRanks(sorted, matches, g.id);
+      m.set(letterForGroup(g), { standings: sorted, lockedRanks });
     }
     return m;
   }, [active, groups, teams, matches]);
@@ -249,14 +254,14 @@ export function KnockoutPage() {
                 <td className="px-4 py-4 align-middle">
                   <CellView
                     cell={row.field1}
-                    standingsByLetter={standingsByLetter}
+                    groupInfoByLetter={groupInfoByLetter}
                     knockoutBySlot={knockoutBySlot}
                   />
                 </td>
                 <td className="px-4 py-4 align-middle">
                   <CellView
                     cell={row.field2}
-                    standingsByLetter={standingsByLetter}
+                    groupInfoByLetter={groupInfoByLetter}
                     knockoutBySlot={knockoutBySlot}
                   />
                 </td>
@@ -273,11 +278,14 @@ export function KnockoutPage() {
 
 function CellView({
   cell,
-  standingsByLetter,
+  groupInfoByLetter,
   knockoutBySlot,
 }: {
   cell: Cell;
-  standingsByLetter: Map<string, StandingRow[]>;
+  groupInfoByLetter: Map<
+    string,
+    { standings: StandingRow[]; lockedRanks: Set<number> }
+  >;
   knockoutBySlot: Map<string, Match>;
 }) {
   if (!cell) {
@@ -290,12 +298,13 @@ function CellView({
   }
 
   const actual = knockoutBySlot.get(cell.slot);
-  const a =
-    actual?.teamA?.name ??
-    resolveSource(cell.teamA, standingsByLetter, knockoutBySlot);
-  const b =
-    actual?.teamB?.name ??
-    resolveSource(cell.teamB, standingsByLetter, knockoutBySlot);
+  // Always resolve from the source (group standings or upstream slot)
+  // so we hide team names until they're mathematically certain — even
+  // if the admin pre-created the knockout match doc with a real team
+  // snapshot. The Firestore match still owns navigation; only the
+  // labels are gated.
+  const a = resolveSource(cell.teamA, groupInfoByLetter, knockoutBySlot);
+  const b = resolveSource(cell.teamB, groupInfoByLetter, knockoutBySlot);
 
   const content = (
     <span className="text-ink-primary">
@@ -336,14 +345,22 @@ function letterForGroup(g: Group): string {
 
 function resolveSource(
   source: SourceRef,
-  standingsByLetter: Map<string, StandingRow[]>,
+  groupInfoByLetter: Map<
+    string,
+    { standings: StandingRow[]; lockedRanks: Set<number> }
+  >,
   knockoutBySlot: Map<string, Match>,
 ): string {
   if (source.type === 'standing') {
-    const standings = standingsByLetter.get(source.groupLetter);
-    const row = standings?.find((r) => r.rank === source.position);
-    if (row) return row.teamName;
-    return `${source.position}. Grupa ${source.groupLetter}`;
+    const info = groupInfoByLetter.get(source.groupLetter);
+    const row = info?.standings.find((r) => r.rank === source.position);
+    // Only swap the placeholder for a real team name if this rank is
+    // mathematically locked (group fully played out OR the team's
+    // position can't change no matter what's left to play).
+    if (row && info?.lockedRanks.has(source.position)) {
+      return row.teamName;
+    }
+    return `${source.position}${source.groupLetter}`;
   }
 
   // Derived from another slot's outcome.

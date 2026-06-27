@@ -112,6 +112,85 @@ export function sortStandings(params: {
   return sorted;
 }
 
+/**
+ * Determine which rank positions in a group are mathematically locked
+ * given the matches played so far. A rank is "locked" if the team
+ * currently sitting in it is guaranteed to stay there regardless of how
+ * the remaining group matches play out.
+ *
+ * The check is conservative (no tiebreakers):
+ *  - Lower-ranked teams overtake T only if their MAX possible final
+ *    points strictly exceed T's MIN. We require U.max < T.min for safety.
+ *  - Higher-ranked teams fall below T only if their MIN points stay
+ *    above T's MAX. We require U.min > T.max for safety.
+ *
+ * If group matches are fully played, every rank is trivially locked.
+ *
+ * @param standings rank-assigned standings for the group (output of
+ *                  `sortStandings`)
+ * @param matches   ALL matches in the tournament; the function filters
+ *                  to the right group internally
+ * @param groupId   the group whose ranks we're testing
+ */
+export function computeLockedRanks(
+  standings: StandingRow[],
+  matches: Match[],
+  groupId: string,
+): Set<number> {
+  const out = new Set<number>();
+  if (standings.length === 0) return out;
+
+  // Remaining matches per team in this group. A team's max final points
+  // is current + 3 * remaining; their min is current (lose them all).
+  const remainingByTeam = new Map<string, number>();
+  for (const m of matches) {
+    if (m.phase !== 'group') continue;
+    if (m.groupId !== groupId) continue;
+    if (m.status === 'finished' || m.status === 'abandoned') continue;
+    const teams = [m.teamA.teamId, m.teamB.teamId];
+    for (const t of teams) {
+      remainingByTeam.set(t, (remainingByTeam.get(t) ?? 0) + 1);
+    }
+  }
+
+  // If nothing is left to play, all ranks are locked.
+  let anyRemaining = false;
+  for (const r of remainingByTeam.values()) if (r > 0) anyRemaining = true;
+  if (!anyRemaining) {
+    standings.forEach((row) => out.add(row.rank));
+    return out;
+  }
+
+  function minMax(row: StandingRow): { min: number; max: number } {
+    const remaining = remainingByTeam.get(row.teamId) ?? 0;
+    return { min: row.points, max: row.points + 3 * remaining };
+  }
+
+  for (const T of standings) {
+    const tBounds = minMax(T);
+    let locked = true;
+    for (const U of standings) {
+      if (U.teamId === T.teamId) continue;
+      const uBounds = minMax(U);
+      if (U.rank > T.rank) {
+        // U currently below T — could overtake if their max ≥ T's min.
+        if (uBounds.max >= tBounds.min) {
+          locked = false;
+          break;
+        }
+      } else if (U.rank < T.rank) {
+        // U currently above T — could fall below if their min ≤ T's max.
+        if (uBounds.min <= tBounds.max) {
+          locked = false;
+          break;
+        }
+      }
+    }
+    if (locked) out.add(T.rank);
+  }
+  return out;
+}
+
 function compareByKey(
   x: StandingRow,
   y: StandingRow,
