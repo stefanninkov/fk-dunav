@@ -4,10 +4,10 @@ import { useTournamentStore } from '@/stores/useTournamentStore';
 
 /**
  * Hardcoded fallback so this works even if the active tournament's
- * startDate hasn't been entered yet. Mirrors HomePage's previous
- * constant — Saturday 27 June 2026 10:00 local (CEST).
+ * startDate hasn't been entered yet. Mirrors HomePage's constant —
+ * Saturday 27 June 2026 11:00 local (CEST), the first match kickoff.
  */
-const FALLBACK_START = new Date('2026-06-27T10:00:00+02:00');
+const FALLBACK_START = new Date('2026-06-27T11:00:00+02:00');
 
 /**
  * Returns true once "now" is past the active tournament's startDate (or

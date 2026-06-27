@@ -30,7 +30,6 @@ import { MatchDetailPage } from '@/pages/public/MatchDetailPage';
 import { PublicAwardsPage } from '@/pages/public/PublicAwardsPage';
 import { LotteryLivePage } from '@/pages/public/LotteryLivePage';
 
-import { AuthGuard } from '@/components/guards/AuthGuard';
 import { CapabilityGuard } from '@/components/guards/CapabilityGuard';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
 import { sr } from '@/i18n/sr';
@@ -173,12 +172,12 @@ export const router = createBrowserRouter(
           element: lazyRoute(<LoginPage />),
         },
         {
+          // Tournament-day mode: AuthGuard intentionally stripped — the
+          // admin panel is publicly reachable, AppRoot auto-signs every
+          // visitor in anonymously so Firestore writes still go through.
+          // Tighten this back to AuthGuard after the tournament.
           path: '/admin',
-          element: lazyRoute(
-            <AuthGuard>
-              <AdminLayout />
-            </AuthGuard>,
-          ),
+          element: lazyRoute(<AdminLayout />),
           children: [
             { index: true, element: lazyRoute(<AdminHomePage />) },
             { path: 'turnir', element: capRoute(<TournamentPage />) },

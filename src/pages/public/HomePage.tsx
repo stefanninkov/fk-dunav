@@ -4,7 +4,7 @@ import { sr } from '@/i18n/sr';
 import { Countdown } from '@/features/home/Countdown';
 import { useTournamentStarted } from '@/hooks/useTournamentStarted';
 
-const TOURNAMENT_START = new Date('2026-06-27T10:00:00+02:00');
+const TOURNAMENT_START = new Date('2026-06-27T11:00:00+02:00');
 
 export function HomePage() {
   const started = useTournamentStarted();

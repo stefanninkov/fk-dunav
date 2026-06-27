@@ -408,14 +408,14 @@ function compareByKey(
 // ---------------------------------------------------------------------------
 //
 // Bracket convention (8-team QF → 4-team SF → Final + 3rd place):
-//   QF1 winner → SF1 teamA         QF2 winner → SF1 teamB
-//   QF3 winner → SF2 teamA         QF4 winner → SF2 teamB
+//   QF1 winner → SF1 teamA         QF4 winner → SF1 teamB
+//   QF2 winner → SF2 teamA         QF3 winner → SF2 teamB
 //   SF1 winner → FINAL teamA       SF2 winner → FINAL teamB
 //   SF1 loser  → TP teamA          SF2 loser  → TP teamB
 //
-// 4-team bracket: QF slot advances straight to Final using the same rule
-// (QF1 → FINAL.A, QF2 → FINAL.B, QF3 → TP.A, QF4 → TP.B). Admins that
-// want a different layout can still edit slots manually.
+// The QF1/QF4 + QF2/QF3 cross matches the public /nokaut schedule that
+// pairs the strongest QF brackets across the table so the final isn't a
+// rematch of an earlier semifinal.
 
 interface SlotTarget {
   slot: string;
@@ -425,9 +425,9 @@ interface SlotTarget {
 function advancementMap(): Record<string, { winner?: SlotTarget; loser?: SlotTarget }> {
   return {
     QF1: { winner: { slot: 'SF1', side: 'a' } },
-    QF2: { winner: { slot: 'SF1', side: 'b' } },
-    QF3: { winner: { slot: 'SF2', side: 'a' } },
-    QF4: { winner: { slot: 'SF2', side: 'b' } },
+    QF4: { winner: { slot: 'SF1', side: 'b' } },
+    QF2: { winner: { slot: 'SF2', side: 'a' } },
+    QF3: { winner: { slot: 'SF2', side: 'b' } },
     SF1: {
       winner: { slot: 'FINAL', side: 'a' },
       loser: { slot: 'TP', side: 'a' },

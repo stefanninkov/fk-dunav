@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -45,7 +45,29 @@ export function AppRoot() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        clearAuth();
+        // Tournament-day mode: open admin panel — anyone with the URL
+        // gets an anonymous Firebase session so writes go through. Rules
+        // grant any signed-in user the staff capability set during the
+        // event. Tighten back to email-link login after the tournament.
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error('Anonymous sign-in failed', err);
+          clearAuth();
+        }
+        return;
+      }
+
+      if (user.isAnonymous) {
+        // Treat anonymous sessions as full staff for the duration of the
+        // tournament. No /admins write, no caps lookup — the role is set
+        // entirely on the client.
+        setUser({
+          uid: user.uid,
+          email: null,
+          role: 'staff',
+          caps: [...ALL_CAPABILITIES],
+        });
         return;
       }
 
