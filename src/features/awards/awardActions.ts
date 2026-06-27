@@ -16,7 +16,6 @@ export interface AwardInput {
   playerId?: string;
   playerName?: string;
   playerPhotoUrl?: string;
-  teamOfTournamentPlayerIds?: string[];
   description?: string;
 }
 
@@ -38,7 +37,6 @@ export async function setAward(
       playerId: input.playerId,
       playerName: input.playerName,
       playerPhotoUrl: input.playerPhotoUrl,
-      teamOfTournamentPlayerIds: input.teamOfTournamentPlayerIds,
       description: input.description,
       awardedAt: serverTimestamp(),
     }) as unknown as Award,

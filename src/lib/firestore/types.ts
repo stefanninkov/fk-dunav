@@ -325,10 +325,10 @@ export type AwardId =
   | 'thirdPlace'
   | 'mvp'
   | 'topScorer'
-  | 'teamOfTournament'
+  | 'bestGoalkeeper'
   | 'crossbarWinner';
 
-export type AwardEntityType = 'team' | 'player' | 'teamOfTournament';
+export type AwardEntityType = 'team' | 'player';
 
 export interface Award {
   id: string;
@@ -338,7 +338,6 @@ export interface Award {
   playerId?: string;
   playerName?: string;
   playerPhotoUrl?: string;
-  teamOfTournamentPlayerIds?: string[];
   description?: string;
   awardedAt: Timestamp;
 }

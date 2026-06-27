@@ -14,8 +14,8 @@ const awardOrder: AwardId[] = [
   'thirdPlace',
   'mvp',
   'topScorer',
+  'bestGoalkeeper',
   'crossbarWinner',
-  'teamOfTournament',
 ];
 
 /**

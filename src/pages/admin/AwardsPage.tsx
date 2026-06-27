@@ -9,10 +9,18 @@ import { useTournamentStore } from '@/stores/useTournamentStore';
 import { setAward } from '@/features/awards/awardActions';
 
 type TeamAwardId = Extract<AwardId, 'champion' | 'runnerUp' | 'thirdPlace'>;
-type PlayerAwardId = Extract<AwardId, 'mvp' | 'topScorer' | 'crossbarWinner'>;
+type PlayerAwardId = Extract<
+  AwardId,
+  'mvp' | 'topScorer' | 'bestGoalkeeper' | 'crossbarWinner'
+>;
 
 const teamAwards: TeamAwardId[] = ['champion', 'runnerUp', 'thirdPlace'];
-const playerAwards: PlayerAwardId[] = ['mvp', 'topScorer', 'crossbarWinner'];
+const playerAwards: PlayerAwardId[] = [
+  'mvp',
+  'topScorer',
+  'bestGoalkeeper',
+  'crossbarWinner',
+];
 
 /**
  * Admin awards editor. Tournament awards only — Lutrija lives in its own
