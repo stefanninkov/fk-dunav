@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
 
 import type { Capability } from '@/lib/firestore/types';
-import { useAuthStore } from '@/stores/useAuthStore';
 
 interface Props {
   children: ReactNode;
@@ -11,19 +9,15 @@ interface Props {
 }
 
 /**
- * Wraps an admin route and blocks access for users who lack the required
- * capability. Admins bypass the check. If the user is missing the cap,
- * they land back on the admin dashboard (which they can always see).
+ * Tournament-day open mode: capability gating is disabled — the admin
+ * panel is publicly reachable and the guard passes every visitor
+ * through. The `cap` prop is kept on the API so the per-route call
+ * sites don't have to change when we tighten back post-tournament.
+ *
+ * Original implementation (capability-based redirect to /admin):
+ * https://github.com/stefanninkov/fk-dunav  — restore from git history
+ * after the event.
  */
-export function CapabilityGuard({ cap, children }: Props) {
-  const role = useAuthStore((s) => s.role);
-  const caps = useAuthStore((s) => s.caps);
-
-  if (role === 'admin') return <>{children}</>;
-
-  // Admin-only route (no cap) → non-admin can't enter.
-  if (!cap) return <Navigate to="/admin" replace />;
-
-  if (caps.includes(cap)) return <>{children}</>;
-  return <Navigate to="/admin" replace />;
+export function CapabilityGuard({ children }: Props) {
+  return <>{children}</>;
 }

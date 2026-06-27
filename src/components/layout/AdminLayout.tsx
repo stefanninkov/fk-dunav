@@ -67,11 +67,15 @@ const allNavItems: NavItemDef[] = [
   { to: '/admin/sampioni', label: sr.admin.nav.champions, icon: History },
 ];
 
-function visibleNavItems(role: 'admin' | 'staff' | null, caps: Capability[]): NavItemDef[] {
-  if (role === 'admin') return allNavItems;
-  if (role !== 'staff') return allNavItems.filter((i) => i.always);
-  const capSet = new Set(caps);
-  return allNavItems.filter((i) => i.always || (i.cap && capSet.has(i.cap)));
+function visibleNavItems(
+  _role: 'admin' | 'staff' | null,
+  _caps: Capability[],
+): NavItemDef[] {
+  // Tournament-day open mode: surface every link unconditionally so a
+  // visitor without an admin role (or with anonymous sign-in still in
+  // flight) can still navigate. Tighten back to capability-based
+  // filtering after the tournament.
+  return allNavItems;
 }
 
 export function AdminLayout() {
