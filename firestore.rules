@@ -1,18 +1,18 @@
 rules_version = '2';
 
 // ------------------------------------------------------------------
-// Firestore rules — TOURNAMENT-DAY OPEN MODE.
+// Firestore rules — TOURNAMENT-DAY OPEN MODE (no auth required).
 //
-// For the 2026 edition the admin panel is publicly reachable: anyone
-// with the URL gets an anonymous Firebase Auth session and can write
-// to the tournament collections. The strict capability-based model
-// (admins / staff invites / caps array) is preserved for /adminEmails,
-// /admins, /users and /invites — those still require an authenticated
-// admin since they control durable role state — but the per-tournament
-// collections relax to `isSignedIn()` (anonymous included).
+// For the 2026 edition the admin panel is publicly reachable AND
+// every per-tournament collection accepts unauthenticated writes —
+// no Firebase Auth account needed at all. The strict capability
+// model still applies to durable role state (/adminEmails, /admins,
+// /users, /invites) so the audit trail isn't tampered with after
+// the event.
 //
-// To tighten back after the tournament: swap each `isSignedIn()` write
-// rule below for the original `hasCap(<cap>)` check (see git history).
+// To tighten back after the tournament: swap each `allow write: if
+// true` below for the original `hasCap(<cap>)` check (see git
+// history).
 // ------------------------------------------------------------------
 
 service cloud.firestore {
@@ -41,8 +41,6 @@ service cloud.firestore {
 
     // ------------------------------------------------------------
     // /admins/{uid} — role cache written by client on self-promotion.
-    // Anonymous users can never become admin; this rule still requires
-    // a real email matching /adminEmails.
     // ------------------------------------------------------------
     match /admins/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
@@ -55,8 +53,7 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------
-    // /users — staff docs. Strict per the capability model — anonymous
-    // sessions can't grant themselves caps via this collection.
+    // /users — staff docs. Strict per the capability model.
     // ------------------------------------------------------------
     match /users/{uid} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
@@ -76,15 +73,14 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------
-    // /invites — admin only (so the strict caps trail is preserved).
+    // /invites — admin only.
     // ------------------------------------------------------------
     match /invites/{email} {
       allow read, write: if isAdmin();
     }
 
     // ------------------------------------------------------------
-    // /tournaments — settings stay admin-only; per-tournament data
-    // opens up to any signed-in session for the tournament-day window.
+    // /tournaments — per-tournament collections open to everyone.
     // ------------------------------------------------------------
     match /tournaments/{tid} {
       allow read: if resource.data.status != 'draft' || isAdmin();
@@ -92,20 +88,20 @@ service cloud.firestore {
       allow create, update: if isAdmin();
       allow delete: if false;
 
-      match /groups/{gid}              { allow read: if true; allow write: if isSignedIn(); }
-      match /groupDrawSession/{sid}    { allow read: if true; allow write: if isSignedIn(); }
-      match /teams/{teamId}            { allow read: if true; allow write: if isSignedIn(); }
-      match /players/{playerId}        { allow read: if true; allow write: if isSignedIn(); }
+      match /groups/{gid}              { allow read: if true; allow write: if true; }
+      match /groupDrawSession/{sid}    { allow read: if true; allow write: if true; }
+      match /teams/{teamId}            { allow read: if true; allow write: if true; }
+      match /players/{playerId}        { allow read: if true; allow write: if true; }
 
       match /matches/{matchId} {
         allow read: if true;
-        allow write: if isSignedIn();
+        allow write: if true;
 
         match /events/{eventId} {
           allow read: if true;
-          allow create: if isSignedIn();
-          allow update: if isSignedIn();
-          allow delete: if isSignedIn();
+          allow create: if true;
+          allow update: if true;
+          allow delete: if true;
         }
       }
 
@@ -117,32 +113,27 @@ service cloud.firestore {
       }
 
       match /photos/{photoId} {
-        // Public sees approved only; staff see everything for moderation.
-        allow read: if (resource != null && resource.data.status == 'approved')
-                     || isSignedIn();
-        // Anonymous submissions still go through createPhotoRecord
-        // (IP rate limit). Direct client creates remain disallowed.
+        allow read: if true;
+        // Anonymous photo uploads still go through the rate-limited
+        // createPhotoRecord callable — direct client creates remain
+        // disallowed. Moderation (update/delete) is open.
         allow create: if isAdmin();
-        allow update, delete: if isSignedIn();
+        allow update, delete: if true;
       }
 
-      match /announcements/{id} { allow read: if true; allow write: if isSignedIn(); }
-      match /sponsors/{id}      { allow read: if true; allow write: if isSignedIn(); }
-      match /kupSanka/{id}      { allow read: if true; allow write: if isSignedIn(); }
-      match /crossbar/{pid}     { allow read: if true; allow write: if isSignedIn(); }
-      match /awards/{awardId}   { allow read: if true; allow write: if isSignedIn(); }
-      match /lottery/{prizeId}  { allow read: if true; allow write: if isSignedIn(); }
-      match /lotteryParticipants/{pid} { allow read: if true; allow write: if isSignedIn(); }
-      match /lotterySession/{sid}      { allow read: if true; allow write: if isSignedIn(); }
-      match /content/{pageId}   { allow read: if true; allow write: if isSignedIn(); }
+      match /announcements/{id}        { allow read: if true; allow write: if true; }
+      match /sponsors/{id}             { allow read: if true; allow write: if true; }
+      match /kupSanka/{id}             { allow read: if true; allow write: if true; }
+      match /crossbar/{pid}            { allow read: if true; allow write: if true; }
+      match /awards/{awardId}          { allow read: if true; allow write: if true; }
+      match /lottery/{prizeId}         { allow read: if true; allow write: if true; }
+      match /lotteryParticipants/{pid} { allow read: if true; allow write: if true; }
+      match /lotterySession/{sid}      { allow read: if true; allow write: if true; }
+      match /content/{pageId}          { allow read: if true; allow write: if true; }
 
       match /fanVotes/{pollId} {
         allow read: if true;
-        allow create, update: if isSignedIn()
-          || (request.resource.data.keys().hasAll(['candidates'])
-              && resource != null
-              && resource.data.status == 'open');
-        allow delete: if isSignedIn();
+        allow create, update, delete: if true;
 
         match /votes/{deviceId} {
           allow read: if false;

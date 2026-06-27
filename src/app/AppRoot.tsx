@@ -35,25 +35,47 @@ import { useActiveTournament } from '@/hooks/useActiveTournament';
  *      with the invite's caps, then load them
  *   4. otherwise → role=null, caps=[] (no admin access)
  */
+/**
+ * Default identity used by admin pages when no Firebase Auth user is
+ * available. The tournament-day Firestore rules allow unauthenticated
+ * writes outright, but admin pages still gate render on `uid` (it goes
+ * onto `createdBy` / `updatedBy` for audit). A stable synthetic id
+ * keeps the editor + actions working without a real sign-in.
+ */
+const GUEST_IDENTITY = {
+  uid: 'guest',
+  email: null,
+  role: 'staff' as const,
+  caps: [...ALL_CAPABILITIES],
+};
+
 export function AppRoot() {
   const setUser = useAuthStore((s) => s.setUser);
-  const clearAuth = useAuthStore((s) => s.clear);
   const setOnline = useOfflineStore((s) => s.setOnline);
   const setReducedMotion = useUIStore((s) => s.setReducedMotion);
   useActiveTournament();
 
+  // Tournament-day open mode: hydrate the auth store with a synthetic
+  // "guest" identity on first paint so admin pages don't sit on
+  // "Učitavanje" forever waiting for a uid that may never arrive (e.g.
+  // anonymous auth disabled on the Firebase project). If a real session
+  // resolves later, the auth listener below overrides this.
+  useEffect(() => {
+    setUser(GUEST_IDENTITY);
+  }, [setUser]);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // Tournament-day mode: open admin panel — anyone with the URL
-        // gets an anonymous Firebase session so writes go through. Rules
-        // grant any signed-in user the staff capability set during the
-        // event. Tighten back to email-link login after the tournament.
+        // Try anonymous sign-in once. If it fails (project doesn't have
+        // anonymous auth enabled, network glitch, App Check rejection)
+        // we keep the guest identity from the initial hydrate so the
+        // admin panel stays usable.
         try {
           await signInAnonymously(auth);
         } catch (err) {
-          console.error('Anonymous sign-in failed', err);
-          clearAuth();
+          console.warn('Anonymous sign-in failed; staying on guest identity', err);
+          setUser(GUEST_IDENTITY);
         }
         return;
       }
@@ -144,7 +166,7 @@ export function AppRoot() {
       setUser({ uid: user.uid, email: user.email, role, caps });
     });
     return unsub;
-  }, [setUser, clearAuth]);
+  }, [setUser]);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
