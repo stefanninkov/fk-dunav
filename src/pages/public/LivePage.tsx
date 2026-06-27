@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { onSnapshot, query, where } from 'firebase/firestore';
+import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
 
-import { matchesCol } from '@/lib/firestore/refs';
-import type { Match } from '@/lib/firestore/types';
+import { matchEventsCol, matchesCol } from '@/lib/firestore/refs';
+import type { Match, MatchEvent } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import { PagePlaceholder } from '@/components/ui/PagePlaceholder';
@@ -43,31 +43,101 @@ export function LivePage() {
         <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
           {live.map((m) => (
             <li key={m.id}>
-              <NavLink
-                to={`/utakmica/${m.id}`}
-                className="flex flex-col gap-3 rounded-lg bg-surface-1 p-5 shadow-card hover:shadow-glow"
-              >
-                <span className="inline-flex items-center gap-2 self-start rounded-full bg-live-soft px-2 py-0.5 text-xs font-600 text-live">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
-                  {sr.match.status.live} · {m.clock.displayMinute}'
-                </span>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="flex-1 font-display text-xl font-600 text-ink-primary">
-                    {m.teamA.name}
-                  </span>
-                  <span className="tnum font-display text-4xl font-700 text-ink-primary">
-                    {m.score.a}:{m.score.b}
-                  </span>
-                  <span className="flex-1 text-right font-display text-xl font-600 text-ink-primary">
-                    {m.teamB.name}
-                  </span>
-                </div>
-                <span className="text-xs text-ink-tertiary">{m.field}</span>
-              </NavLink>
+              <LiveMatchCard match={m} tournamentId={active.id} />
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * One live match card. Subscribes to the match's goal events so the
+ * scorer names render under the score in real time — same source the
+ * match-detail page uses, just collapsed to a compact "Strelci" line.
+ */
+function LiveMatchCard({
+  match,
+  tournamentId,
+}: {
+  match: Match;
+  tournamentId: string;
+}) {
+  const [goals, setGoals] = useState<MatchEvent[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(
+        matchEventsCol(tournamentId, match.id),
+        where('type', '==', 'goal'),
+        where('deleted', '==', false),
+        orderBy('minute', 'asc'),
+      ),
+      (snap) => setGoals(snap.docs.map((d) => d.data())),
+    );
+    return unsub;
+  }, [tournamentId, match.id]);
+
+  const goalsByTeam = (side: 'a' | 'b') =>
+    goals.filter((g) => g.team === side);
+
+  return (
+    <NavLink
+      to={`/utakmica/${match.id}`}
+      className="flex flex-col gap-3 rounded-lg bg-surface-1 p-5 shadow-card hover:shadow-glow"
+    >
+      <span className="inline-flex items-center gap-2 self-start rounded-full bg-live-soft px-2 py-0.5 text-xs font-600 text-live">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
+        {sr.match.status.live} · {match.clock.displayMinute}'
+      </span>
+      <div className="flex items-center justify-between gap-4">
+        <span className="flex-1 font-display text-xl font-600 text-ink-primary">
+          {match.teamA.name}
+        </span>
+        <span className="tnum font-display text-4xl font-700 text-ink-primary">
+          {match.score.a}:{match.score.b}
+        </span>
+        <span className="flex-1 text-right font-display text-xl font-600 text-ink-primary">
+          {match.teamB.name}
+        </span>
+      </div>
+
+      {goals.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-2 text-xs text-ink-secondary">
+          <ScorerList goals={goalsByTeam('a')} align="left" />
+          <ScorerList goals={goalsByTeam('b')} align="right" />
+        </div>
+      ) : null}
+
+      <span className="text-xs text-ink-tertiary">{match.field}</span>
+    </NavLink>
+  );
+}
+
+function ScorerList({
+  goals,
+  align,
+}: {
+  goals: MatchEvent[];
+  align: 'left' | 'right';
+}) {
+  if (goals.length === 0) return <span />;
+  return (
+    <ul
+      className={`flex flex-col gap-0.5 ${align === 'right' ? 'items-end text-right' : 'items-start'}`}
+    >
+      {goals.map((g) => (
+        <li key={g.id} className="flex items-baseline gap-1.5">
+          <span className="font-500 text-ink-primary">
+            ⚽ {g.playerName ?? 'Nepoznato'}
+          </span>
+          {g.ownGoal ? (
+            <span className="text-[0.65rem] uppercase tracking-wide text-danger">AG</span>
+          ) : null}
+          <span className="tnum text-ink-tertiary">{g.minute}'</span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -150,6 +150,8 @@ export interface Match {
 
   score: { a: number; b: number };
   shootoutScore?: { a: number; b: number };
+  forfeit?: boolean;
+  forfeitWinner?: 'a' | 'b';
 
   status: MatchStatus;
   clock: MatchClock;

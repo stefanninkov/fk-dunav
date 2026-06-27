@@ -17,6 +17,7 @@ import {
   abandonMatch,
   endHalf,
   endMatch,
+  forfeitMatch,
   logCard,
   logGoal,
   pauseMatch,
@@ -151,13 +152,14 @@ export function AdminMatchEditorPage() {
           match={match}
           players={playersByTeam.get(match.teamA.teamId) ?? []}
           disabled={busy || match.status !== 'live'}
-          onGoal={(player) =>
+          onGoal={(player, opts) =>
             act(() =>
               logGoal(active.id, match.id, uid, {
-                team: 'a',
+                team: opts?.ownGoal ? 'b' : 'a',
                 minute: displayMinute,
                 playerId: player.id,
                 playerName: player.name,
+                ownGoal: opts?.ownGoal,
               }),
             )
           }
@@ -178,13 +180,14 @@ export function AdminMatchEditorPage() {
           match={match}
           players={playersByTeam.get(match.teamB.teamId) ?? []}
           disabled={busy || match.status !== 'live'}
-          onGoal={(player) =>
+          onGoal={(player, opts) =>
             act(() =>
               logGoal(active.id, match.id, uid, {
-                team: 'b',
+                team: opts?.ownGoal ? 'a' : 'b',
                 minute: displayMinute,
                 playerId: player.id,
                 playerName: player.name,
+                ownGoal: opts?.ownGoal,
               }),
             )
           }
@@ -204,9 +207,30 @@ export function AdminMatchEditorPage() {
 
       <section className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-1 p-4 shadow-card">
         {match.status === 'scheduled' ? (
-          <Btn busy={busy} onClick={() => act(() => startMatch(active.id, match.id, uid))}>
-            {sr.match.actions.start}
-          </Btn>
+          <>
+            <Btn busy={busy} onClick={() => act(() => startMatch(active.id, match.id, uid))}>
+              {sr.match.actions.start}
+            </Btn>
+            <Btn
+              variant="ghost"
+              busy={busy}
+              onClick={() => {
+                const choice = prompt(
+                  `Predaja meča — koji tim nije došao?\n\nUkucaj "a" za "${match.teamA.name}" (gubi 0:3) ili "b" za "${match.teamB.name}" (gubi 3:0).`,
+                );
+                if (!choice) return;
+                const c = choice.trim().toLowerCase();
+                if (c !== 'a' && c !== 'b') return;
+                const winnerSide: 'a' | 'b' = c === 'a' ? 'b' : 'a';
+                const winnerName =
+                  winnerSide === 'a' ? match.teamA.name : match.teamB.name;
+                if (!confirm(`Potvrdi predaju: pobednik ${winnerName} 3:0?`)) return;
+                void act(() => forfeitMatch(active.id, match.id, uid, winnerSide));
+              }}
+            >
+              Predaja meča
+            </Btn>
+          </>
         ) : null}
 
         {match.status === 'live' && match.clock.state === 'running' ? (
@@ -347,7 +371,7 @@ function TeamPanel({
   match: Match;
   players: Player[];
   disabled: boolean;
-  onGoal: (player: PickedPlayer) => void;
+  onGoal: (player: PickedPlayer, opts?: { ownGoal?: boolean }) => void;
   onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
 }) {
   const team = side === 'a' ? match.teamA : match.teamB;
@@ -368,7 +392,7 @@ function TeamPanel({
           {team.name}
         </span>
         <span className="text-xs text-ink-tertiary">
-          ⚽ gol · 🟨 karton · 🟥 karton
+          ⚽ gol · AG · 🟨 karton · 🟥 karton
         </span>
       </button>
 
@@ -377,8 +401,8 @@ function TeamPanel({
           teamName={team.name}
           players={players}
           onClose={() => setSheetOpen(false)}
-          onGoal={(p) => {
-            onGoal(p);
+          onGoal={(p, opts) => {
+            onGoal(p, opts);
             setSheetOpen(false);
           }}
           onCard={(type, p) => {
@@ -407,17 +431,18 @@ function PlayerActionSheet({
   teamName: string;
   players: Player[];
   onClose: () => void;
-  onGoal: (player: PickedPlayer) => void;
+  onGoal: (player: PickedPlayer, opts?: { ownGoal?: boolean }) => void;
   onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
 }) {
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherName, setOtherName] = useState('');
 
-  function commitOther(kind: 'goal' | 'yellow' | 'red') {
+  function commitOther(kind: 'goal' | 'ownGoal' | 'yellow' | 'red') {
     const trimmed = otherName.trim();
     if (!trimmed) return;
     const picked: PickedPlayer = { name: trimmed };
     if (kind === 'goal') onGoal(picked);
+    else if (kind === 'ownGoal') onGoal(picked, { ownGoal: true });
     else if (kind === 'yellow') onCard('yellowCard', picked);
     else onCard('redCard', picked);
     setOtherName('');
@@ -475,8 +500,18 @@ function PlayerActionSheet({
                     type="button"
                     onClick={() => onGoal(picked)}
                     className="h-10 min-w-[3rem] rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary active:bg-brand-500"
+                    aria-label={sr.match.actions.addGoal}
                   >
                     ⚽
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onGoal(picked, { ownGoal: true })}
+                    className="h-10 min-w-[3rem] rounded-md bg-surface-3 px-3 text-[0.7rem] font-700 uppercase tracking-wide text-ink-secondary active:bg-surface-2"
+                    aria-label="Autogol"
+                    title="Autogol"
+                  >
+                    AG
                   </button>
                   <button
                     type="button"
@@ -518,6 +553,16 @@ function PlayerActionSheet({
                   className="h-touch flex-1 rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary disabled:opacity-60"
                 >
                   ⚽ {sr.match.actions.addGoal}
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('ownGoal')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-surface-3 px-3 text-[0.7rem] font-700 uppercase tracking-wide text-ink-secondary disabled:opacity-60"
+                  aria-label="Autogol"
+                  title="Autogol"
+                >
+                  AG
                 </button>
                 <button
                   type="button"

@@ -78,6 +78,11 @@ function Section({ title, matches }: { title: string; matches: Match[] }) {
                   ({m.shootoutScore.a}:{m.shootoutScore.b})
                 </span>
               ) : null}
+              {m.forfeit ? (
+                <span className="ml-1 text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+                  Predaja
+                </span>
+              ) : null}
             </span>
           </li>
         ))}

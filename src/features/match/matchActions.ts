@@ -236,6 +236,41 @@ export async function endMatch(
   await batch.commit();
 }
 
+/**
+ * Forfeit ("predaja"): one side didn't show up so the present side
+ * walks away with a 3:0 official scoreline. Used from the editor when
+ * the opponent is a no-show — no clock, no events, just stamp a final
+ * score and close out the match.
+ */
+export async function forfeitMatch(
+  tournamentId: string,
+  matchId: string,
+  uid: string,
+  winnerSide: 'a' | 'b',
+): Promise<void> {
+  const ref = matchDoc(tournamentId, matchId);
+  const batch = writeBatch(db);
+  const score = winnerSide === 'a' ? { a: 3, b: 0 } : { a: 0, b: 3 };
+  batch.update(ref, {
+    status: 'finished',
+    score,
+    forfeit: true,
+    forfeitWinner: winnerSide,
+    'clock.state': 'ended',
+    'clock.halfStartedAt': null,
+    'clock.displayMinute': 0,
+    actualEnd: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+  await appendEventBatch(batch, tournamentId, matchId, {
+    type: 'matchEnd',
+    minute: 0,
+    createdBy: uid,
+  });
+  await batch.commit();
+}
+
 export async function abandonMatch(
   tournamentId: string,
   matchId: string,
