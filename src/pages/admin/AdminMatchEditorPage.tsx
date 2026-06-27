@@ -7,8 +7,15 @@ import {
   matchDoc,
   matchEventsCol,
   playersCol,
+  teamsCol,
 } from '@/lib/firestore/refs';
-import type { Match, MatchEvent, Player } from '@/lib/firestore/types';
+import type {
+  Match,
+  MatchEvent,
+  Player,
+  Team,
+  TeamSnapshot,
+} from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTournamentStore } from '@/stores/useTournamentStore';
@@ -26,6 +33,7 @@ import {
   softDeleteEvent,
   startMatch,
   startSecondHalf,
+  updateMatchSchedule,
 } from '@/features/match/matchActions';
 import { ShootoutModal } from '@/features/match/components/ShootoutModal';
 
@@ -45,10 +53,12 @@ export function AdminMatchEditorPage() {
   const [match, setMatch] = useState<Match | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shootoutOpen, setShootoutOpen] = useState(false);
   const [scoreEditOpen, setScoreEditOpen] = useState(false);
+  const [teamSwapOpen, setTeamSwapOpen] = useState(false);
 
   useEffect(() => {
     if (!active || !matchId) return;
@@ -66,10 +76,19 @@ export function AdminMatchEditorPage() {
     const unsubPlayers = onSnapshot(playersCol(active.id), (snap) =>
       setAllPlayers(snap.docs.map((d) => d.data())),
     );
+    const unsubTeams = onSnapshot(teamsCol(active.id), (snap) =>
+      setAllTeams(
+        snap.docs
+          .map((d) => d.data())
+          .filter((t) => !t.deletedAt)
+          .sort((a, b) => a.name.localeCompare(b.name, 'sr')),
+      ),
+    );
     return () => {
       unsubMatch();
       unsubEvents();
       unsubPlayers();
+      unsubTeams();
     };
   }, [active, matchId]);
 
@@ -241,6 +260,12 @@ export function AdminMatchEditorPage() {
           </Btn>
         ) : null}
 
+        {match.status === 'scheduled' ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setTeamSwapOpen(true)}>
+            Promeni timove
+          </Btn>
+        ) : null}
+
         {match.status === 'live' && match.clock.state === 'running' ? (
           <>
             <Btn
@@ -333,6 +358,20 @@ export function AdminMatchEditorPage() {
           onSave={(score) => {
             setScoreEditOpen(false);
             void act(() => setMatchScore(active.id, match.id, uid, score));
+          }}
+        />
+      ) : null}
+
+      {teamSwapOpen ? (
+        <TeamSwapModal
+          match={match}
+          teams={allTeams}
+          onClose={() => setTeamSwapOpen(false)}
+          onSave={(teamA, teamB) => {
+            setTeamSwapOpen(false);
+            void act(() =>
+              updateMatchSchedule(active.id, match.id, { teamA, teamB }),
+            );
           }}
         />
       ) : null}
@@ -612,6 +651,123 @@ function PlayerActionSheet({
               + Drugi (unesi ručno)
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pick teamA/teamB from the full team list. Used to repair bracket
+ * pairings (e.g. after group standings shake out differently than the
+ * bracket was originally drawn). Writes a fresh TeamSnapshot derived
+ * from the chosen Team docs, preserving groupId.
+ */
+function TeamSwapModal({
+  match,
+  teams,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  teams: Team[];
+  onClose: () => void;
+  onSave: (teamA: TeamSnapshot, teamB: TeamSnapshot) => void;
+}) {
+  const [aId, setAId] = useState(match.teamA.teamId);
+  const [bId, setBId] = useState(match.teamB.teamId);
+
+  const aTeam = teams.find((t) => t.id === aId);
+  const bTeam = teams.find((t) => t.id === bId);
+  const valid = !!aTeam && !!bTeam && aId !== bId;
+
+  function snap(t: Team): TeamSnapshot {
+    const out: TeamSnapshot = { teamId: t.id, name: t.name };
+    if (t.shortName) out.shortName = t.shortName;
+    if (t.logoUrl) out.logoUrl = t.logoUrl;
+    if (t.groupId) out.groupId = t.groupId;
+    return out;
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <span className="font-display text-base font-700 text-ink-primary">
+            Promeni timove
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex flex-col gap-3 px-4 py-4">
+          <label className="flex flex-col gap-1 text-xs text-ink-secondary">
+            <span>Tim A</span>
+            <select
+              value={aId}
+              onChange={(e) => setAId(e.target.value)}
+              className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-secondary">
+            <span>Tim B</span>
+            <select
+              value={bId}
+              onChange={(e) => setBId(e.target.value)}
+              className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {aId === bId ? (
+            <p className="text-xs text-danger">Mora biti dva različita tima.</p>
+          ) : null}
+        </div>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => {
+              if (!aTeam || !bTeam) return;
+              onSave(snap(aTeam), snap(bTeam));
+            }}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
         </div>
       </div>
     </div>
