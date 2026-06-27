@@ -10,10 +10,10 @@ export function HomePage() {
   const started = useTournamentStarted();
 
   // Once the countdown has fired, the home page is no longer the most
-  // useful landing — drop visitors straight onto Rezultati where the
-  // live group standings + match schedule live.
+  // useful landing — drop visitors straight onto Grupe where the live
+  // group standings live.
   if (started) {
-    return <Navigate to="/rezultati" replace />;
+    return <Navigate to="/grupe" replace />;
   }
 
   return (
