@@ -101,11 +101,13 @@ export function StatisticsPage() {
     };
   }, []);
 
-  const scorers = useMemo<ScorerRow[]>(() => {
-    const map = new Map<string, ScorerRow>();
+  const { scorers, knockoutScorers } = useMemo(() => {
+    const allMap = new Map<string, ScorerRow>();
+    const koMap = new Map<string, ScorerRow>();
     for (const [matchId, events] of eventsByMatch.entries()) {
       const match = matches.find((m) => m.id === matchId);
       if (!match) continue;
+      const isKnockout = match.phase === 'knockout';
       for (const ev of events) {
         if (ev.type !== 'goal') continue;
         if (ev.ownGoal) continue; // own goals don't count toward a scorer tally
@@ -117,26 +119,32 @@ export function StatisticsPage() {
               ? match.teamB.name
               : undefined;
         const key = ev.playerId ? `id:${ev.playerId}` : `name:${name}`;
-        const existing = map.get(key);
-        if (existing) {
-          existing.goals += 1;
-          if (!existing.teamName && teamName) existing.teamName = teamName;
-        } else {
-          map.set(key, {
-            key,
-            playerId: ev.playerId,
-            playerName: name,
-            teamName,
-            goals: 1,
-          });
-        }
+        const bump = (target: Map<string, ScorerRow>) => {
+          const existing = target.get(key);
+          if (existing) {
+            existing.goals += 1;
+            if (!existing.teamName && teamName) existing.teamName = teamName;
+          } else {
+            target.set(key, {
+              key,
+              playerId: ev.playerId,
+              playerName: name,
+              teamName,
+              goals: 1,
+            });
+          }
+        };
+        bump(allMap);
+        if (isKnockout) bump(koMap);
       }
     }
-    return [...map.values()].sort(
-      (a, b) =>
-        b.goals - a.goals ||
-        a.playerName.localeCompare(b.playerName, 'sr'),
-    );
+    const sortRows = (m: Map<string, ScorerRow>) =>
+      [...m.values()].sort(
+        (a, b) =>
+          b.goals - a.goals ||
+          a.playerName.localeCompare(b.playerName, 'sr'),
+      );
+    return { scorers: sortRows(allMap), knockoutScorers: sortRows(koMap) };
   }, [eventsByMatch, matches]);
 
   if (!active) {
@@ -156,6 +164,20 @@ export function StatisticsPage() {
             </p>
           ) : (
             <ScorersTable scorers={scorers} />
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-1 font-display text-xl font-600">Najbolji strelac</h2>
+          <p className="mb-3 text-xs text-ink-tertiary">
+            Samo golovi iz nokaut faze (od četvrtfinala nadalje).
+          </p>
+          {knockoutScorers.length === 0 ? (
+            <p className="rounded-md bg-surface-1 px-4 py-6 text-sm text-ink-tertiary">
+              Još nema golova u nokaut fazi.
+            </p>
+          ) : (
+            <ScorersTable scorers={knockoutScorers} />
           )}
         </section>
 
