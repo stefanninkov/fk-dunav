@@ -7,27 +7,27 @@ import type {
   TiebreakerKey,
   Tournament,
 } from '@/lib/firestore/types';
-import { createMatch } from '@/features/match/matchActions';
+import { createMatch, deleteMatch } from '@/features/match/matchActions';
 import { computeStandings, sortStandings } from '@/lib/utils/standings';
 
 /**
  * Mirrors the public KnockoutPage SCHEDULE template. Any time you rewire
  * the bracket there, mirror the change here so the schedule generator
  * keeps producing the same pairings.
+ *
+ * NOTE: only QFs are listed. SF / TP / FINAL get created later (after
+ * upstream matches finish) — generating them up-front with placeholder
+ * teams was confusing because the slots showed random pairings.
  */
 interface TemplateCell {
-  slot: 'QF1' | 'QF2' | 'QF3' | 'QF4' | 'SF1' | 'SF2' | 'TP' | 'FINAL';
+  slot: 'QF1' | 'QF2' | 'QF3' | 'QF4';
   round: KnockoutRound;
   time: string;
   /** Index into `tournament.config.fields`. */
   fieldIndex: number;
-  teamA: SourceRef;
-  teamB: SourceRef;
+  teamA: { pos: number; letter: string };
+  teamB: { pos: number; letter: string };
 }
-
-type SourceRef =
-  | { type: 'standing'; pos: number; letter: string }
-  | { type: 'derived' };
 
 const TEMPLATE: TemplateCell[] = [
   {
@@ -35,64 +35,32 @@ const TEMPLATE: TemplateCell[] = [
     round: 'qf',
     time: '11:00',
     fieldIndex: 0,
-    teamA: { type: 'standing', pos: 1, letter: 'A' },
-    teamB: { type: 'standing', pos: 4, letter: 'B' },
+    teamA: { pos: 1, letter: 'A' },
+    teamB: { pos: 4, letter: 'B' },
   },
   {
     slot: 'QF2',
     round: 'qf',
     time: '11:00',
     fieldIndex: 1,
-    teamA: { type: 'standing', pos: 1, letter: 'B' },
-    teamB: { type: 'standing', pos: 4, letter: 'A' },
+    teamA: { pos: 1, letter: 'B' },
+    teamB: { pos: 4, letter: 'A' },
   },
   {
     slot: 'QF3',
     round: 'qf',
     time: '12:00',
     fieldIndex: 0,
-    teamA: { type: 'standing', pos: 2, letter: 'A' },
-    teamB: { type: 'standing', pos: 3, letter: 'B' },
+    teamA: { pos: 2, letter: 'A' },
+    teamB: { pos: 3, letter: 'B' },
   },
   {
     slot: 'QF4',
     round: 'qf',
     time: '12:00',
     fieldIndex: 1,
-    teamA: { type: 'standing', pos: 2, letter: 'B' },
-    teamB: { type: 'standing', pos: 3, letter: 'A' },
-  },
-  {
-    slot: 'SF1',
-    round: 'sf',
-    time: '14:00',
-    fieldIndex: 0,
-    teamA: { type: 'derived' },
-    teamB: { type: 'derived' },
-  },
-  {
-    slot: 'SF2',
-    round: 'sf',
-    time: '15:00',
-    fieldIndex: 0,
-    teamA: { type: 'derived' },
-    teamB: { type: 'derived' },
-  },
-  {
-    slot: 'TP',
-    round: 'thirdPlace',
-    time: '17:00',
-    fieldIndex: 0,
-    teamA: { type: 'derived' },
-    teamB: { type: 'derived' },
-  },
-  {
-    slot: 'FINAL',
-    round: 'final',
-    time: '19:00',
-    fieldIndex: 0,
-    teamA: { type: 'derived' },
-    teamB: { type: 'derived' },
+    teamA: { pos: 2, letter: 'B' },
+    teamB: { pos: 3, letter: 'A' },
   },
 ];
 
@@ -108,22 +76,26 @@ function makeSnap(t: Team): TeamSnapshot {
   return out;
 }
 
+/**
+ * Placeholder snapshot used when the standings can't be resolved yet
+ * (group letter missing, not enough teams, etc.). The name mirrors the
+ * public /nokaut label ("1A", "4B") so the row reads the same way.
+ */
+function placeholderSnap(pos: number, letter: string): TeamSnapshot {
+  return { teamId: `__placeholder__${pos}${letter}`, name: `${pos}${letter}` };
+}
+
 export interface GenerateBracketResult {
   created: string[];
   skipped: { slot: string; reason: string }[];
 }
 
 /**
- * Create every missing knockout match (QF1-4, SF1-2, TP, FINAL) for the
- * tournament in one shot. Skips slots that already have a match doc.
- *
- *  - QFs resolve teamA/teamB from the live group standings (with
- *    `Group.manualOrder` applied). If a position can't be resolved
- *    (group letter missing, not enough teams) the QF is skipped.
- *  - SF / TP / FINAL get placeholder teams (the first two teams of the
- *    tournament). `propagateBracketWinner` overwrites teamA/teamB on
- *    these slots when their source matches finish, so the placeholders
- *    are temporary until the upstream QFs/SFs are decided.
+ * Create every missing QF match for the tournament. Skips slots that
+ * already have a match doc. teamA/teamB are resolved from the live
+ * group standings (with `Group.manualOrder` applied); if a position
+ * can't be resolved, a placeholder snapshot with the public /nokaut
+ * label ("1A", "4B") is written instead.
  *
  * Day-2 date comes from `tournament.startDate + 1 day`. Times + field
  * positions come from the TEMPLATE constant above.
@@ -161,15 +133,11 @@ export async function generateBracketMatches(params: {
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const fields = tournament.config.fields;
-  const placeholderA = teams[0];
-  const placeholderB = teams[1] ?? teams[0];
 
-  function resolve(ref: SourceRef): Team | undefined {
-    if (ref.type === 'standing') {
-      const row = standingsByLetter.get(ref.letter)?.find((r) => r.rank === ref.pos);
-      return row ? teamById.get(row.teamId) : undefined;
-    }
-    return placeholderA;
+  function resolve(ref: { pos: number; letter: string }): TeamSnapshot {
+    const row = standingsByLetter.get(ref.letter)?.find((r) => r.rank === ref.pos);
+    const real = row ? teamById.get(row.teamId) : undefined;
+    return real ? makeSnap(real) : placeholderSnap(ref.pos, ref.letter);
   }
 
   const created: string[] = [];
@@ -186,21 +154,7 @@ export async function generateBracketMatches(params: {
     }
 
     const teamA = resolve(cell.teamA);
-    let teamB =
-      cell.teamB.type === 'derived' ? placeholderB : resolve(cell.teamB);
-
-    if (!teamA || !teamB) {
-      skipped.push({
-        slot: cell.slot,
-        reason: 'timovi nisu rešeni',
-      });
-      continue;
-    }
-    if (teamA.id === teamB.id) {
-      // Placeholder collision (e.g. only one team in the tournament).
-      // Force teamB to the next available team.
-      teamB = teams.find((t) => t.id !== teamA!.id) ?? teamB;
-    }
+    const teamB = resolve(cell.teamB);
 
     const [hh, mm] = cell.time.split(':').map(Number);
     const scheduledStart = new Date(day2);
@@ -212,11 +166,34 @@ export async function generateBracketMatches(params: {
       bracketSlot: cell.slot,
       field: fields[cell.fieldIndex] ?? fields[0] ?? 'Teren 1',
       scheduledStart,
-      teamA: makeSnap(teamA),
-      teamB: makeSnap(teamB),
+      teamA,
+      teamB,
     });
     created.push(cell.slot);
   }
 
   return { created, skipped };
+}
+
+/**
+ * Delete every knockout match doc that isn't a quarterfinal AND hasn't
+ * started yet. Used to clean up SF / TP / FINAL slots that were
+ * generated too early — once QFs finish the admin re-runs
+ * `generateBracketMatches` (or a future SF generator) to recreate them
+ * with real teams.
+ */
+export async function deleteUnfinishedKnockoutDownstream(
+  tournamentId: string,
+  matches: Match[],
+): Promise<string[]> {
+  const targets = matches.filter(
+    (m) =>
+      m.phase === 'knockout' &&
+      m.status === 'scheduled' &&
+      m.knockoutRound !== 'qf',
+  );
+  for (const m of targets) {
+    await deleteMatch(tournamentId, m.id);
+  }
+  return targets.map((m) => m.bracketSlot ?? m.id);
 }

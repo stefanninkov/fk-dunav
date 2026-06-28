@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { Wand2 } from 'lucide-react';
+import { Trash2, Wand2 } from 'lucide-react';
 
 import { groupsCol, matchesCol, teamsCol } from '@/lib/firestore/refs';
 import type { Group, Match, Team } from '@/lib/firestore/types';
 import { sr } from '@/i18n/sr';
 import { useTournamentStore } from '@/stores/useTournamentStore';
 import {
+  deleteUnfinishedKnockoutDownstream,
   generateBracketMatches,
   type GenerateBracketResult,
 } from '@/features/match/generateBracket';
@@ -63,6 +64,43 @@ export function AdminMatchesPage() {
     }
   }
 
+  async function handleCleanupSfFinal() {
+    if (!active) return;
+    const targets = (matches ?? []).filter(
+      (m) =>
+        m.phase === 'knockout' &&
+        m.status === 'scheduled' &&
+        m.knockoutRound !== 'qf',
+    );
+    if (targets.length === 0) {
+      setResult({ created: [], skipped: [] });
+      return;
+    }
+    if (
+      !confirm(
+        `Obrisati ${targets.length} zakazanih PF/finale utakmica? Mogu se ponovo generisati kasnije.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const deleted = await deleteUnfinishedKnockoutDownstream(
+        active.id,
+        matches ?? [],
+      );
+      setResult({
+        created: [],
+        skipped: deleted.map((slot) => ({ slot, reason: 'obrisano' })),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!active) {
     return (
       <section className="flex flex-col gap-3">
@@ -76,21 +114,41 @@ export function AdminMatchesPage() {
 
   const hasAnyKnockout =
     (matches ?? []).some((m) => m.phase === 'knockout');
+  const hasScheduledDownstream = (matches ?? []).some(
+    (m) =>
+      m.phase === 'knockout' &&
+      m.status === 'scheduled' &&
+      m.knockoutRound !== 'qf',
+  );
 
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-700">{sr.admin.nav.matches}</h1>
-        <button
-          type="button"
-          onClick={() => void handleGenerate()}
-          disabled={busy || teams.length < 2 || groups.length === 0}
-          className="inline-flex h-touch items-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
-          title="Kreira ČF1–ČF4 sa timovima iz grupa + PF1, PF2, treće mesto i finale sa privremenim timovima"
-        >
-          <Wand2 size={16} />
-          {hasAnyKnockout ? 'Dopuni nokaut utakmice' : 'Generiši nokaut utakmice'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasScheduledDownstream ? (
+            <button
+              type="button"
+              onClick={() => void handleCleanupSfFinal()}
+              disabled={busy}
+              className="inline-flex h-touch items-center gap-2 rounded-md border border-surface-4 px-3 text-ink-secondary hover:bg-surface-2 disabled:opacity-60"
+              title="Obriši PF1, PF2, treće mesto i finale dok se ne završi četvrtfinale"
+            >
+              <Trash2 size={14} />
+              Obriši PF/finale
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleGenerate()}
+            disabled={busy || teams.length < 2 || groups.length === 0}
+            className="inline-flex h-touch items-center gap-2 rounded-md bg-brand-600 px-4 font-600 text-ink-primary hover:bg-brand-500 disabled:opacity-60"
+            title="Kreira ČF1–ČF4 sa timovima iz grupa (placeholderi 1A/4B/… ako standings nisu rešene)"
+          >
+            <Wand2 size={16} />
+            {hasAnyKnockout ? 'Dopuni nokaut utakmice' : 'Generiši nokaut utakmice'}
+          </button>
+        </div>
       </header>
 
       {error ? (
