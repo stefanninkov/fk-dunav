@@ -272,17 +272,23 @@ export async function deleteUnfinishedKnockoutDownstream(
 
 /**
  * Walk every existing SF / TP / FINAL doc whose status is still
- * 'scheduled' and rewrite teamA/teamB to whatever the /nokaut TEMPLATE
- * would put there. Live + finished docs are left untouched so
- * in-progress reporters and final scorelines don't get clobbered.
+ * 'scheduled' and rewrite teamA/teamB AND scheduledStart to whatever
+ * the /nokaut TEMPLATE would put there. Live + finished docs are left
+ * untouched so in-progress reporters and final scorelines don't get
+ * clobbered.
  *
  * Returns the list of bracketSlot strings that actually changed.
  */
 export async function syncKnockoutDownstreamTeams(params: {
-  tournamentId: string;
+  tournament: Tournament;
   matches: Match[];
 }): Promise<string[]> {
-  const { tournamentId, matches } = params;
+  const { tournament, matches } = params;
+  const tournamentId = tournament.id;
+
+  const day2 = new Date(tournament.startDate.toDate());
+  day2.setDate(day2.getDate() + 1);
+
   const matchBySlot = new Map<string, Match>();
   for (const m of matches) {
     if (m.phase === 'knockout' && m.bracketSlot) matchBySlot.set(m.bracketSlot, m);
@@ -317,18 +323,29 @@ export async function syncKnockoutDownstreamTeams(params: {
     const expectedA = resolve(cell.teamA);
     const expectedB = resolve(cell.teamB);
 
+    const [hh, mm] = cell.time.split(':').map(Number);
+    const expectedStart = new Date(day2);
+    expectedStart.setHours(hh, mm, 0, 0);
+
     const aSame =
       existing.teamA.teamId === expectedA.teamId &&
       existing.teamA.name === expectedA.name;
     const bSame =
       existing.teamB.teamId === expectedB.teamId &&
       existing.teamB.name === expectedB.name;
-    if (aSame && bSame) continue;
+    const startSame =
+      existing.scheduledStart.toDate().getTime() === expectedStart.getTime();
+    if (aSame && bSame && startSame) continue;
 
-    await updateMatchSchedule(tournamentId, existing.id, {
-      teamA: expectedA,
-      teamB: expectedB,
-    });
+    const patch: {
+      teamA?: TeamSnapshot;
+      teamB?: TeamSnapshot;
+      scheduledStart?: Date;
+    } = {};
+    if (!aSame) patch.teamA = expectedA;
+    if (!bSame) patch.teamB = expectedB;
+    if (!startSame) patch.scheduledStart = expectedStart;
+    await updateMatchSchedule(tournamentId, existing.id, patch);
     changed.push(cell.slot);
   }
   return changed;

@@ -72,7 +72,7 @@ export function AdminMatchesPage() {
     setResult(null);
     try {
       const changed = await syncKnockoutDownstreamTeams({
-        tournamentId: active.id,
+        tournament: active,
         matches: matches ?? [],
       });
       setResult({
