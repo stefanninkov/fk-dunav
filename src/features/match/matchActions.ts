@@ -237,6 +237,34 @@ export async function endMatch(
 }
 
 /**
+ * Set the penalty-shootout score directly — the simple alternative to
+ * the kick-by-kick ShootoutModal. If the match is still live, also
+ * closes it out (status='finished', clock ended) so the winner
+ * propagates to the next bracket slot.
+ */
+export async function setShootoutScore(
+  tournamentId: string,
+  matchId: string,
+  uid: string,
+  shootoutScore: { a: number; b: number },
+  finishMatch: boolean,
+): Promise<void> {
+  const ref = matchDoc(tournamentId, matchId);
+  const body: Record<string, unknown> = {
+    shootoutScore,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  };
+  if (finishMatch) {
+    body.status = 'finished';
+    body['clock.state'] = 'ended';
+    body['clock.halfStartedAt'] = null;
+    body.actualEnd = serverTimestamp();
+  }
+  await updateDoc(ref, body);
+}
+
+/**
  * Override the cached score directly. Used when the events log is wrong
  * (reporter forgot to log goals, etc.) or to fix a stuck 0:0 final.
  * Sets `manualScore: true` so the `recomputeMatchScore` Cloud Function

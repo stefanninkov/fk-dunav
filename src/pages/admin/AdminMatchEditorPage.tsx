@@ -30,6 +30,7 @@ import {
   pauseMatch,
   resumeMatch,
   setMatchScore,
+  setShootoutScore,
   softDeleteEvent,
   startMatch,
   startSecondHalf,
@@ -59,6 +60,7 @@ export function AdminMatchEditorPage() {
   const [shootoutOpen, setShootoutOpen] = useState(false);
   const [scoreEditOpen, setScoreEditOpen] = useState(false);
   const [teamSwapOpen, setTeamSwapOpen] = useState(false);
+  const [penaltiesOpen, setPenaltiesOpen] = useState(false);
 
   useEffect(() => {
     if (!active || !matchId) return;
@@ -260,6 +262,13 @@ export function AdminMatchEditorPage() {
           </Btn>
         ) : null}
 
+        {match.phase === 'knockout' &&
+        (match.status === 'live' || match.status === 'finished') ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setPenaltiesOpen(true)}>
+            {match.shootoutScore ? 'Ispravi penale' : 'Penali'}
+          </Btn>
+        ) : null}
+
         {match.status === 'scheduled' ? (
           <Btn variant="ghost" busy={busy} onClick={() => setTeamSwapOpen(true)}>
             Promeni timove
@@ -371,6 +380,25 @@ export function AdminMatchEditorPage() {
             setTeamSwapOpen(false);
             void act(() =>
               updateMatchSchedule(active.id, match.id, { teamA, teamB }),
+            );
+          }}
+        />
+      ) : null}
+
+      {penaltiesOpen ? (
+        <PenaltiesModal
+          match={match}
+          onClose={() => setPenaltiesOpen(false)}
+          onSave={(score) => {
+            setPenaltiesOpen(false);
+            void act(() =>
+              setShootoutScore(
+                active.id,
+                match.id,
+                uid,
+                score,
+                match.status === 'live',
+              ),
             );
           }}
         />
@@ -764,6 +792,119 @@ function TeamSwapModal({
               if (!aTeam || !bTeam) return;
               onSave(snap(aTeam), snap(bTeam));
             }}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Direct penalty-shootout score entry — the simple alternative to the
+ * kick-by-kick ShootoutModal. Two number inputs (Tim A / Tim B
+ * penalty count); save writes `shootoutScore` and, if the match is
+ * still live, also closes it out so the winner propagates downstream.
+ */
+function PenaltiesModal({
+  match,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  onClose: () => void;
+  onSave: (score: { a: number; b: number }) => void;
+}) {
+  const [a, setA] = useState(String(match.shootoutScore?.a ?? ''));
+  const [b, setB] = useState(String(match.shootoutScore?.b ?? ''));
+
+  const aNum = Number.parseInt(a, 10);
+  const bNum = Number.parseInt(b, 10);
+  const valid =
+    Number.isFinite(aNum) &&
+    Number.isFinite(bNum) &&
+    aNum >= 0 &&
+    bNum >= 0 &&
+    aNum !== bNum;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+              Penali
+            </span>
+            <span className="font-display text-base font-700 text-ink-primary">
+              {match.teamA.name} vs {match.teamB.name}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex items-end justify-between gap-3 px-4 py-5">
+          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-secondary">
+            <span className="truncate">{match.teamA.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={a}
+              onChange={(e) => setA(e.target.value)}
+              autoFocus
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+          <span className="pb-3 text-2xl text-ink-tertiary">:</span>
+          <label className="flex flex-1 flex-col gap-1 text-right text-xs text-ink-secondary">
+            <span className="truncate">{match.teamB.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+        </div>
+
+        <p className="px-4 pb-3 text-xs text-ink-tertiary">
+          {match.status === 'live'
+            ? 'Pobednik prolazi dalje, utakmica se zatvara.'
+            : 'Samo penal-skor — rezultat sa terena ostaje nepromenjen.'}
+        </p>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => onSave({ a: aNum, b: bNum })}
             className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
           >
             {sr.common.save}
