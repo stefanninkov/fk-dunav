@@ -74,7 +74,7 @@ const TEMPLATE: TemplateCell[] = [
   {
     slot: 'SF1',
     round: 'sf',
-    time: '14:00',
+    time: '15:00',
     fieldIndex: 0,
     teamA: { type: 'winner', sourceSlot: 'QF1' },
     teamB: { type: 'winner', sourceSlot: 'QF4' },
@@ -82,7 +82,7 @@ const TEMPLATE: TemplateCell[] = [
   {
     slot: 'SF2',
     round: 'sf',
-    time: '15:00',
+    time: '14:00',
     fieldIndex: 0,
     teamA: { type: 'winner', sourceSlot: 'QF2' },
     teamB: { type: 'winner', sourceSlot: 'QF3' },
