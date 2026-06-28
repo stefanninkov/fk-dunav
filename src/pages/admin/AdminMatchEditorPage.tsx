@@ -1,0 +1,1130 @@
+import { useEffect, useMemo, useState } from 'react';
+import { NavLink, useParams } from 'react-router-dom';
+import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { Trash2, X } from 'lucide-react';
+
+import {
+  matchDoc,
+  matchEventsCol,
+  playersCol,
+  teamsCol,
+} from '@/lib/firestore/refs';
+import type {
+  Match,
+  MatchEvent,
+  Player,
+  Team,
+  TeamSnapshot,
+} from '@/lib/firestore/types';
+import { sr } from '@/i18n/sr';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useTournamentStore } from '@/stores/useTournamentStore';
+import { useMatchClock } from '@/features/match/useMatchClock';
+import {
+  abandonMatch,
+  endHalf,
+  endMatch,
+  forfeitMatch,
+  logCard,
+  logGoal,
+  pauseMatch,
+  resumeMatch,
+  setMatchScore,
+  setShootoutScore,
+  softDeleteEvent,
+  startMatch,
+  startSecondHalf,
+  updateMatchSchedule,
+} from '@/features/match/matchActions';
+import { ShootoutModal } from '@/features/match/components/ShootoutModal';
+
+/**
+ * Editor surface for the match reporter. Designed for one-handed phone use:
+ *  - Big colored state badge so glance-tells you what phase the match is in.
+ *  - Per-team player picker (with free-text fallback) — types are awful on
+ *    a phone in a stadium, dropdown removes the typo class entirely.
+ *  - Per-event delete button (soft-delete; rule-restricted to own events
+ *    + only the deleted-flag field).
+ *  - Confirms on every destructive transition (end / abandon / delete).
+ */
+export function AdminMatchEditorPage() {
+  const { matchId } = useParams<{ matchId: string }>();
+  const active = useTournamentStore((s) => s.active);
+  const uid = useAuthStore((s) => s.uid);
+  const [match, setMatch] = useState<Match | null>(null);
+  const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shootoutOpen, setShootoutOpen] = useState(false);
+  const [scoreEditOpen, setScoreEditOpen] = useState(false);
+  const [teamSwapOpen, setTeamSwapOpen] = useState(false);
+  const [penaltiesOpen, setPenaltiesOpen] = useState(false);
+
+  useEffect(() => {
+    if (!active || !matchId) return;
+    const unsubMatch = onSnapshot(matchDoc(active.id, matchId), (snap) => {
+      setMatch(snap.exists() ? snap.data() : null);
+    });
+    const unsubEvents = onSnapshot(
+      query(
+        matchEventsCol(active.id, matchId),
+        where('deleted', '==', false),
+        orderBy('minute', 'asc'),
+      ),
+      (snap) => setEvents(snap.docs.map((d) => d.data())),
+    );
+    const unsubPlayers = onSnapshot(playersCol(active.id), (snap) =>
+      setAllPlayers(snap.docs.map((d) => d.data())),
+    );
+    const unsubTeams = onSnapshot(teamsCol(active.id), (snap) =>
+      setAllTeams(
+        snap.docs
+          .map((d) => d.data())
+          .filter((t) => !t.deletedAt)
+          .sort((a, b) => a.name.localeCompare(b.name, 'sr')),
+      ),
+    );
+    return () => {
+      unsubMatch();
+      unsubEvents();
+      unsubPlayers();
+      unsubTeams();
+    };
+  }, [active, matchId]);
+
+  const liveMinute = useMatchClock(match);
+  const displayMinute = useMemo(() => {
+    if (!match) return 0;
+    return match.clock.state === 'running' ? liveMinute : match.clock.displayMinute;
+  }, [match, liveMinute]);
+
+  const playersByTeam = useMemo(() => {
+    const m = new Map<string, Player[]>();
+    for (const p of allPlayers) {
+      if (!p.active) continue;
+      const list = m.get(p.teamId) ?? [];
+      list.push(p);
+      m.set(p.teamId, list);
+    }
+    for (const list of m.values()) {
+      list.sort((a, b) => a.lastName.localeCompare(b.lastName, 'sr'));
+    }
+    return m;
+  }, [allPlayers]);
+
+  if (!active || !match || !uid) {
+    return <p className="text-sm text-ink-secondary">{sr.common.loading}</p>;
+  }
+
+  async function act(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const halfMinutes = active.config.matchFormat.halfDurationSeconds / 60;
+  const status = badgeForStatus(match);
+
+  return (
+    <section className="flex flex-col gap-6 pb-12">
+      <NavLink to="/admin/utakmice" className="text-sm text-ink-secondary hover:text-ink-primary">
+        ← {sr.admin.nav.matches}
+      </NavLink>
+
+      <header className="rounded-lg bg-surface-1 p-5 shadow-card">
+        <div className="flex items-center justify-between gap-4">
+          <TeamHeader name={match.teamA.name} />
+          <div className="flex flex-col items-center">
+            <span className="tnum font-display text-6xl font-700 text-ink-primary">
+              {match.score.a}:{match.score.b}
+            </span>
+            <span
+              className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-700 uppercase tracking-wide ${status.cls}`}
+            >
+              {status.dot ? (
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-2 w-2 rounded-full ${status.dotCls}`}
+                />
+              ) : null}
+              {status.label}
+            </span>
+            <span className="mt-1 text-xs text-ink-tertiary">
+              {displayMinute}'
+            </span>
+          </div>
+          <TeamHeader name={match.teamB.name} alignEnd />
+        </div>
+      </header>
+
+      {error ? (
+        <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>
+      ) : null}
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TeamPanel
+          side="a"
+          match={match}
+          players={playersByTeam.get(match.teamA.teamId) ?? []}
+          disabled={busy || match.status !== 'live'}
+          onGoal={(player, opts) =>
+            act(() =>
+              logGoal(active.id, match.id, uid, {
+                team: opts?.ownGoal ? 'b' : 'a',
+                minute: displayMinute,
+                playerId: player.id,
+                playerName: player.name,
+                ownGoal: opts?.ownGoal,
+              }),
+            )
+          }
+          onCard={(type, player) =>
+            act(() =>
+              logCard(active.id, match.id, uid, {
+                team: 'a',
+                type,
+                minute: displayMinute,
+                playerId: player.id,
+                playerName: player.name,
+              }),
+            )
+          }
+        />
+        <TeamPanel
+          side="b"
+          match={match}
+          players={playersByTeam.get(match.teamB.teamId) ?? []}
+          disabled={busy || match.status !== 'live'}
+          onGoal={(player, opts) =>
+            act(() =>
+              logGoal(active.id, match.id, uid, {
+                team: opts?.ownGoal ? 'a' : 'b',
+                minute: displayMinute,
+                playerId: player.id,
+                playerName: player.name,
+                ownGoal: opts?.ownGoal,
+              }),
+            )
+          }
+          onCard={(type, player) =>
+            act(() =>
+              logCard(active.id, match.id, uid, {
+                team: 'b',
+                type,
+                minute: displayMinute,
+                playerId: player.id,
+                playerName: player.name,
+              }),
+            )
+          }
+        />
+      </section>
+
+      <section className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-1 p-4 shadow-card">
+        {match.status === 'scheduled' ? (
+          <Btn busy={busy} onClick={() => act(() => startMatch(active.id, match.id, uid))}>
+            {sr.match.actions.start}
+          </Btn>
+        ) : null}
+        {match.status === 'scheduled' || match.forfeit ? (
+          <Btn
+            variant="ghost"
+            busy={busy}
+            onClick={() => {
+              const choice = prompt(
+                `Predaja meča — koji tim nije došao?\n\nUkucaj "a" za "${match.teamA.name}" (gubi 0:3) ili "b" za "${match.teamB.name}" (gubi 3:0).`,
+              );
+              if (!choice) return;
+              const c = choice.trim().toLowerCase();
+              if (c !== 'a' && c !== 'b') return;
+              const winnerSide: 'a' | 'b' = c === 'a' ? 'b' : 'a';
+              const winnerName =
+                winnerSide === 'a' ? match.teamA.name : match.teamB.name;
+              if (!confirm(`Potvrdi predaju: pobednik ${winnerName} 3:0?`)) return;
+              void act(() => forfeitMatch(active.id, match.id, uid, winnerSide));
+            }}
+          >
+            {match.forfeit ? 'Ispravi predaju' : 'Predaja meča'}
+          </Btn>
+        ) : null}
+
+        {match.status === 'live' || match.status === 'finished' ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setScoreEditOpen(true)}>
+            Ispravi rezultat
+          </Btn>
+        ) : null}
+
+        {match.phase === 'knockout' &&
+        (match.status === 'live' || match.status === 'finished') ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setPenaltiesOpen(true)}>
+            {match.shootoutScore ? 'Ispravi penale' : 'Penali'}
+          </Btn>
+        ) : null}
+
+        {match.status === 'scheduled' ? (
+          <Btn variant="ghost" busy={busy} onClick={() => setTeamSwapOpen(true)}>
+            Promeni timove
+          </Btn>
+        ) : null}
+
+        {match.status === 'live' && match.clock.state === 'running' ? (
+          <>
+            <Btn
+              variant="ghost"
+              busy={busy}
+              onClick={() => act(() => pauseMatch(active.id, match.id, uid, displayMinute))}
+            >
+              {sr.match.actions.pause}
+            </Btn>
+            <Btn
+              variant="ghost"
+              busy={busy}
+              onClick={() => {
+                if (!confirm('Zatvoriti poluvreme?')) return;
+                void act(() => endHalf(active.id, match.id, uid, displayMinute));
+              }}
+            >
+              {sr.match.actions.halftime}
+            </Btn>
+          </>
+        ) : null}
+
+        {match.status === 'live' && match.clock.state === 'paused' ? (
+          <Btn busy={busy} onClick={() => act(() => resumeMatch(active.id, match.id, uid))}>
+            {sr.match.actions.resume}
+          </Btn>
+        ) : null}
+
+        {match.status === 'live' && match.clock.state === 'halftime' ? (
+          <Btn
+            busy={busy}
+            onClick={() =>
+              act(() => startSecondHalf(active.id, match.id, uid, halfMinutes * 60))
+            }
+          >
+            II poluvreme
+          </Btn>
+        ) : null}
+
+        {match.status === 'live' ? (
+          <>
+            <Btn
+              variant="danger"
+              busy={busy}
+              onClick={() => {
+                const tied = match.score.a === match.score.b;
+                if (match.phase === 'knockout' && tied) {
+                  setShootoutOpen(true);
+                  return;
+                }
+                if (
+                  !confirm(
+                    `Završiti utakmicu sa rezultatom ${match.score.a}:${match.score.b}?`,
+                  )
+                )
+                  return;
+                void act(() => endMatch(active.id, match.id, uid, displayMinute));
+              }}
+            >
+              {sr.match.actions.end}
+            </Btn>
+            <Btn
+              variant="ghost"
+              busy={busy}
+              onClick={() => {
+                if (!confirm('Prekinuti utakmicu? Akcija je trajna.')) return;
+                void act(() => abandonMatch(active.id, match.id, uid, displayMinute));
+              }}
+            >
+              Prekini
+            </Btn>
+          </>
+        ) : null}
+      </section>
+
+      {shootoutOpen ? (
+        <ShootoutModal
+          tournamentId={active.id}
+          match={match}
+          uid={uid}
+          displayMinute={displayMinute}
+          onClose={() => setShootoutOpen(false)}
+        />
+      ) : null}
+
+      {scoreEditOpen ? (
+        <ScoreEditModal
+          match={match}
+          onClose={() => setScoreEditOpen(false)}
+          onSave={(score) => {
+            setScoreEditOpen(false);
+            void act(() => setMatchScore(active.id, match.id, uid, score));
+          }}
+        />
+      ) : null}
+
+      {teamSwapOpen ? (
+        <TeamSwapModal
+          match={match}
+          teams={allTeams}
+          onClose={() => setTeamSwapOpen(false)}
+          onSave={(teamA, teamB) => {
+            setTeamSwapOpen(false);
+            void act(() =>
+              updateMatchSchedule(active.id, match.id, { teamA, teamB }),
+            );
+          }}
+        />
+      ) : null}
+
+      {penaltiesOpen ? (
+        <PenaltiesModal
+          match={match}
+          onClose={() => setPenaltiesOpen(false)}
+          onSave={(score) => {
+            setPenaltiesOpen(false);
+            void act(() =>
+              setShootoutScore(
+                active.id,
+                match.id,
+                uid,
+                score,
+                match.status === 'live',
+              ),
+            );
+          }}
+        />
+      ) : null}
+
+      <section>
+        <h2 className="mb-3 font-display text-sm font-600 text-ink-secondary">Tok utakmice</h2>
+        {events.length === 0 ? (
+          <p className="rounded-md bg-surface-1 px-4 py-6 text-center text-sm text-ink-tertiary">
+            Još nema događaja.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {events.map((e) => (
+              <EventRow
+                key={e.id}
+                event={e}
+                match={match}
+                canDelete={e.createdBy === uid && match.status === 'live'}
+                onDelete={() =>
+                  act(() => softDeleteEvent(active.id, match.id, e, uid))
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+interface PickedPlayer {
+  id?: string;
+  name: string;
+}
+
+function TeamHeader({ name, alignEnd }: { name: string; alignEnd?: boolean }) {
+  return (
+    <div className={`flex flex-1 flex-col ${alignEnd ? 'items-end' : ''}`}>
+      <span className="font-display text-lg font-600 text-ink-primary sm:text-2xl">{name}</span>
+    </div>
+  );
+}
+
+function TeamPanel({
+  side,
+  match,
+  players,
+  disabled,
+  onGoal,
+  onCard,
+}: {
+  side: 'a' | 'b';
+  match: Match;
+  players: Player[];
+  disabled: boolean;
+  onGoal: (player: PickedPlayer, opts?: { ownGoal?: boolean }) => void;
+  onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
+}) {
+  const team = side === 'a' ? match.teamA : match.teamB;
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setSheetOpen(true)}
+        className="flex h-full min-h-[5rem] flex-col items-start justify-center gap-1 rounded-lg bg-surface-1 p-4 text-left shadow-card transition-colors active:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="text-xs uppercase tracking-wide text-ink-tertiary">
+          {disabled ? 'Tim' : 'Klikni za događaj'}
+        </span>
+        <span className="font-display text-base font-700 text-ink-primary sm:text-lg">
+          {team.name}
+        </span>
+        <span className="text-xs text-ink-tertiary">
+          ⚽ gol · AG · 🟨 karton · 🟥 karton
+        </span>
+      </button>
+
+      {sheetOpen ? (
+        <PlayerActionSheet
+          teamName={team.name}
+          players={players}
+          onClose={() => setSheetOpen(false)}
+          onGoal={(p, opts) => {
+            onGoal(p, opts);
+            setSheetOpen(false);
+          }}
+          onCard={(type, p) => {
+            onCard(type, p);
+            setSheetOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Bottom-sheet roster picker. One row per player with three quick-tap
+ * action buttons — Goal / Yellow / Red. A "Drugi (unesi ručno)" footer
+ * row lets the reporter log an event for an off-roster player without
+ * leaving the sheet.
+ */
+function PlayerActionSheet({
+  teamName,
+  players,
+  onClose,
+  onGoal,
+  onCard,
+}: {
+  teamName: string;
+  players: Player[];
+  onClose: () => void;
+  onGoal: (player: PickedPlayer, opts?: { ownGoal?: boolean }) => void;
+  onCard: (type: 'yellowCard' | 'redCard', player: PickedPlayer) => void;
+}) {
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherName, setOtherName] = useState('');
+
+  function commitOther(kind: 'goal' | 'ownGoal' | 'yellow' | 'red') {
+    const trimmed = otherName.trim();
+    if (!trimmed) return;
+    const picked: PickedPlayer = { name: trimmed };
+    if (kind === 'goal') onGoal(picked);
+    else if (kind === 'ownGoal') onGoal(picked, { ownGoal: true });
+    else if (kind === 'yellow') onCard('yellowCard', picked);
+    else onCard('redCard', picked);
+    setOtherName('');
+    setOtherOpen(false);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+              {sr.match.actions.addGoal} · karton
+            </span>
+            <span className="font-display text-base font-700 text-ink-primary">
+              {teamName}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <ul className="flex-1 overflow-y-auto px-3 py-3">
+          {players.length === 0 ? (
+            <li className="rounded-md bg-surface-2 px-3 py-4 text-center text-sm italic text-ink-tertiary">
+              Nema igrača u rosteru. Koristi <strong>Drugi</strong> ispod.
+            </li>
+          ) : (
+            players.map((p) => {
+              const picked: PickedPlayer = { id: p.id, name: p.displayName };
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-2 border-b border-surface-3 py-2 last:border-b-0"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-primary">
+                    {p.displayName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onGoal(picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary active:bg-brand-500"
+                    aria-label={sr.match.actions.addGoal}
+                  >
+                    ⚽
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onGoal(picked, { ownGoal: true })}
+                    className="h-10 min-w-[3rem] rounded-md bg-surface-3 px-3 text-[0.7rem] font-700 uppercase tracking-wide text-ink-secondary active:bg-surface-2"
+                    aria-label="Autogol"
+                    title="Autogol"
+                  >
+                    AG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCard('yellowCard', picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-warning-soft px-3 text-sm font-700 text-warning active:opacity-90"
+                    aria-label="Žuti karton"
+                  >
+                    🟨
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCard('redCard', picked)}
+                    className="h-10 min-w-[3rem] rounded-md bg-danger-soft px-3 text-sm font-700 text-danger active:opacity-90"
+                    aria-label="Crveni karton"
+                  >
+                    🟥
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+
+        <div className="border-t border-surface-3 px-3 py-3">
+          {otherOpen ? (
+            <div className="flex flex-col gap-2">
+              <input
+                value={otherName}
+                onChange={(e) => setOtherName(e.target.value)}
+                placeholder="Ime i prezime"
+                autoFocus
+                className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('goal')}
+                  className="h-touch flex-1 rounded-md bg-brand-600 px-3 text-sm font-700 text-ink-primary disabled:opacity-60"
+                >
+                  ⚽ {sr.match.actions.addGoal}
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('ownGoal')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-surface-3 px-3 text-[0.7rem] font-700 uppercase tracking-wide text-ink-secondary disabled:opacity-60"
+                  aria-label="Autogol"
+                  title="Autogol"
+                >
+                  AG
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('yellow')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-warning-soft px-3 text-sm font-700 text-warning disabled:opacity-60"
+                  aria-label="Žuti karton"
+                >
+                  🟨
+                </button>
+                <button
+                  type="button"
+                  disabled={!otherName.trim()}
+                  onClick={() => commitOther('red')}
+                  className="h-touch min-w-[3.5rem] rounded-md bg-danger-soft px-3 text-sm font-700 text-danger disabled:opacity-60"
+                  aria-label="Crveni karton"
+                >
+                  🟥
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setOtherOpen(true)}
+              className="h-touch w-full rounded-md border border-dashed border-surface-4 text-sm text-ink-secondary hover:bg-surface-2"
+            >
+              + Drugi (unesi ručno)
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pick teamA/teamB from the full team list. Used to repair bracket
+ * pairings (e.g. after group standings shake out differently than the
+ * bracket was originally drawn). Writes a fresh TeamSnapshot derived
+ * from the chosen Team docs, preserving groupId.
+ */
+function TeamSwapModal({
+  match,
+  teams,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  teams: Team[];
+  onClose: () => void;
+  onSave: (teamA: TeamSnapshot, teamB: TeamSnapshot) => void;
+}) {
+  const [aId, setAId] = useState(match.teamA.teamId);
+  const [bId, setBId] = useState(match.teamB.teamId);
+
+  const aTeam = teams.find((t) => t.id === aId);
+  const bTeam = teams.find((t) => t.id === bId);
+  const valid = !!aTeam && !!bTeam && aId !== bId;
+
+  function snap(t: Team): TeamSnapshot {
+    const out: TeamSnapshot = { teamId: t.id, name: t.name };
+    if (t.shortName) out.shortName = t.shortName;
+    if (t.logoUrl) out.logoUrl = t.logoUrl;
+    if (t.groupId) out.groupId = t.groupId;
+    return out;
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <span className="font-display text-base font-700 text-ink-primary">
+            Promeni timove
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex flex-col gap-3 px-4 py-4">
+          <label className="flex flex-col gap-1 text-xs text-ink-secondary">
+            <span>Tim A</span>
+            <select
+              value={aId}
+              onChange={(e) => setAId(e.target.value)}
+              className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-secondary">
+            <span>Tim B</span>
+            <select
+              value={bId}
+              onChange={(e) => setBId(e.target.value)}
+              className="h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-ink-primary outline-none focus:border-brand-500"
+            >
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {aId === bId ? (
+            <p className="text-xs text-danger">Mora biti dva različita tima.</p>
+          ) : null}
+        </div>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => {
+              if (!aTeam || !bTeam) return;
+              onSave(snap(aTeam), snap(bTeam));
+            }}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Direct penalty-shootout score entry — the simple alternative to the
+ * kick-by-kick ShootoutModal. Two number inputs (Tim A / Tim B
+ * penalty count); save writes `shootoutScore` and, if the match is
+ * still live, also closes it out so the winner propagates downstream.
+ */
+function PenaltiesModal({
+  match,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  onClose: () => void;
+  onSave: (score: { a: number; b: number }) => void;
+}) {
+  const [a, setA] = useState(String(match.shootoutScore?.a ?? ''));
+  const [b, setB] = useState(String(match.shootoutScore?.b ?? ''));
+
+  const aNum = Number.parseInt(a, 10);
+  const bNum = Number.parseInt(b, 10);
+  const valid =
+    Number.isFinite(aNum) &&
+    Number.isFinite(bNum) &&
+    aNum >= 0 &&
+    bNum >= 0 &&
+    aNum !== bNum;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-wide text-ink-tertiary">
+              Penali
+            </span>
+            <span className="font-display text-base font-700 text-ink-primary">
+              {match.teamA.name} vs {match.teamB.name}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex items-end justify-between gap-3 px-4 py-5">
+          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-secondary">
+            <span className="truncate">{match.teamA.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={a}
+              onChange={(e) => setA(e.target.value)}
+              autoFocus
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+          <span className="pb-3 text-2xl text-ink-tertiary">:</span>
+          <label className="flex flex-1 flex-col gap-1 text-right text-xs text-ink-secondary">
+            <span className="truncate">{match.teamB.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+        </div>
+
+        <p className="px-4 pb-3 text-xs text-ink-tertiary">
+          {match.status === 'live'
+            ? 'Pobednik prolazi dalje, utakmica se zatvara.'
+            : 'Samo penal-skor — rezultat sa terena ostaje nepromenjen.'}
+        </p>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => onSave({ a: aNum, b: bNum })}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Manual score override. Two number inputs, Save calls setMatchScore
+ * which stamps `manualScore: true` so the Cloud Function leaves the
+ * doc alone going forward.
+ */
+function ScoreEditModal({
+  match,
+  onClose,
+  onSave,
+}: {
+  match: Match;
+  onClose: () => void;
+  onSave: (score: { a: number; b: number }) => void;
+}) {
+  const [a, setA] = useState(String(match.score.a));
+  const [b, setB] = useState(String(match.score.b));
+
+  const aNum = Number.parseInt(a, 10);
+  const bNum = Number.parseInt(b, 10);
+  const valid =
+    Number.isFinite(aNum) && Number.isFinite(bNum) && aNum >= 0 && bNum >= 0;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col rounded-t-2xl bg-surface-1 shadow-elevated sm:rounded-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+          <span className="font-display text-base font-700 text-ink-primary">
+            Ispravi rezultat
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-ink-secondary hover:bg-surface-2"
+            aria-label={sr.common.close}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="flex items-end justify-between gap-3 px-4 py-5">
+          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-secondary">
+            <span className="truncate">{match.teamA.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={a}
+              onChange={(e) => setA(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+          <span className="pb-3 text-2xl text-ink-tertiary">:</span>
+          <label className="flex flex-1 flex-col gap-1 text-right text-xs text-ink-secondary">
+            <span className="truncate">{match.teamB.name}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              className="tnum h-touch w-full rounded-md border border-surface-4 bg-surface-2 px-3 text-center font-display text-2xl font-700 text-ink-primary outline-none focus:border-brand-500"
+            />
+          </label>
+        </div>
+
+        <p className="px-4 pb-3 text-xs text-ink-tertiary">
+          Strelci se ne menjaju — ovo postavlja samo prikazani rezultat.
+        </p>
+
+        <div className="flex gap-2 border-t border-surface-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-touch flex-1 rounded-md border border-surface-4 text-sm font-600 text-ink-secondary hover:bg-surface-2"
+          >
+            {sr.common.cancel}
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => onSave({ a: aNum, b: bNum })}
+            className="h-touch flex-1 rounded-md bg-brand-600 text-sm font-700 text-ink-primary disabled:opacity-60"
+          >
+            {sr.common.save}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventRow({
+  event,
+  match,
+  canDelete,
+  onDelete,
+}: {
+  event: MatchEvent;
+  match: Match;
+  canDelete: boolean;
+  onDelete: () => void;
+}) {
+  const teamName =
+    event.team === 'a' ? match.teamA.name : event.team === 'b' ? match.teamB.name : '';
+  const label =
+    event.type === 'goal'
+      ? 'GOL'
+      : event.type === 'yellowCard'
+        ? 'Žuti karton'
+        : event.type === 'redCard'
+          ? 'Crveni karton'
+          : event.type === 'matchStart'
+            ? 'Početak'
+            : event.type === 'matchEnd'
+              ? 'Kraj'
+              : event.type === 'halfEnd'
+                ? 'Poluvreme'
+                : event.type === 'halfStart'
+                  ? 'II poluvreme'
+                  : event.type;
+  return (
+    <li className="flex items-center gap-3 rounded-lg bg-surface-1 px-4 py-3 text-sm shadow-card">
+      <span className="tnum w-10 font-600 text-ink-secondary">{event.minute}'</span>
+      <span className="flex-1 text-ink-primary">
+        <span className="text-ink-tertiary">{teamName}</span> {label}
+        {event.playerName ? ` — ${event.playerName}` : ''}
+      </span>
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirm(`Obrisati: ${label}${event.playerName ? ` — ${event.playerName}` : ''}?`)) return;
+            onDelete();
+          }}
+          className="rounded-md p-2 text-ink-tertiary hover:bg-surface-2 hover:text-danger"
+          aria-label="Obriši događaj"
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+function Btn({
+  children,
+  onClick,
+  busy,
+  variant = 'primary',
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  busy: boolean;
+  variant?: 'primary' | 'ghost' | 'danger';
+}) {
+  const cls =
+    variant === 'primary'
+      ? 'bg-brand-600 text-ink-primary hover:bg-brand-500'
+      : variant === 'danger'
+        ? 'bg-danger text-ink-primary hover:bg-danger/90'
+        : 'border border-surface-4 text-ink-secondary hover:bg-surface-2';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className={`h-touch rounded-md px-4 font-600 disabled:opacity-60 ${cls}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function badgeForStatus(match: Match): {
+  label: string;
+  cls: string;
+  dot?: boolean;
+  dotCls?: string;
+} {
+  if (match.status === 'scheduled') {
+    return { label: 'Zakazana', cls: 'bg-surface-2 text-ink-secondary' };
+  }
+  if (match.status === 'finished') {
+    return { label: 'Završena', cls: 'bg-surface-2 text-ink-secondary' };
+  }
+  if (match.status === 'abandoned') {
+    return { label: 'Prekinuta', cls: 'bg-danger-soft text-danger' };
+  }
+  // live
+  if (match.clock.state === 'paused') {
+    return { label: 'Pauzirano', cls: 'bg-warning-soft text-warning' };
+  }
+  if (match.clock.state === 'halftime') {
+    return { label: 'Poluvreme', cls: 'bg-warning-soft text-warning' };
+  }
+  return {
+    label: 'Uživo',
+    cls: 'bg-live-soft text-live',
+    dot: true,
+    dotCls: 'bg-live animate-pulse',
+  };
+}

@@ -1,0 +1,171 @@
+rules_version = '2';
+
+// ------------------------------------------------------------------
+// Firestore rules — TOURNAMENT-DAY OPEN MODE (no auth required).
+//
+// For the 2026 edition the admin panel is publicly reachable AND
+// every per-tournament collection accepts unauthenticated writes —
+// no Firebase Auth account needed at all. The strict capability
+// model still applies to durable role state (/adminEmails, /admins,
+// /users, /invites) so the audit trail isn't tampered with after
+// the event.
+//
+// To tighten back after the tournament: swap each `allow write: if
+// true` below for the original `hasCap(<cap>)` check (see git
+// history).
+// ------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function inviteCapsForCaller() {
+      return get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.caps;
+    }
+
+    // ------------------------------------------------------------
+    // /adminEmails — bootstrap seed (doc id must equal the email).
+    // ------------------------------------------------------------
+    match /adminEmails/{email} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------
+    // /admins/{uid} — role cache written by client on self-promotion.
+    // ------------------------------------------------------------
+    match /admins/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn()
+                     && request.auth.uid == uid
+                     && request.auth.token.email != null
+                     && exists(/databases/$(database)/documents/adminEmails/$(request.auth.token.email))
+                     && request.resource.data.email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------
+    // /users — staff docs. Strict per the capability model.
+    // ------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      allow create: if isSignedIn()
+                     && request.auth.uid == uid
+                     && request.auth.token.email != null
+                     && request.resource.data.email == request.auth.token.email
+                     && exists(/databases/$(database)/documents/invites/$(request.auth.token.email))
+                     && get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.revoked == false
+                     && request.resource.data.caps.hasAll(inviteCapsForCaller())
+                     && request.resource.data.caps.hasOnly(inviteCapsForCaller());
+      allow update: if isAdmin()
+                     || (isSignedIn()
+                         && request.auth.uid == uid
+                         && request.resource.data.caps == resource.data.caps);
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // /invites — admin only.
+    // ------------------------------------------------------------
+    match /invites/{email} {
+      allow read, write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // /tournaments — per-tournament collections open to everyone.
+    // ------------------------------------------------------------
+    match /tournaments/{tid} {
+      allow read: if resource.data.status != 'draft' || isAdmin();
+      allow list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+
+      match /groups/{gid}              { allow read: if true; allow write: if true; }
+      match /groupDrawSession/{sid}    { allow read: if true; allow write: if true; }
+      match /teams/{teamId}            { allow read: if true; allow write: if true; }
+      match /players/{playerId}        { allow read: if true; allow write: if true; }
+
+      match /matches/{matchId} {
+        allow read: if true;
+        allow write: if true;
+
+        match /events/{eventId} {
+          allow read: if true;
+          allow create: if true;
+          allow update: if true;
+          allow delete: if true;
+        }
+      }
+
+      match /standings/{teamId} {
+        allow read: if true;
+        // Standings are recomputed by the Cloud Function (Admin SDK
+        // bypasses rules). Admin manual fix as fallback.
+        allow write: if isAdmin();
+      }
+
+      match /photos/{photoId} {
+        allow read: if true;
+        // Anonymous photo uploads still go through the rate-limited
+        // createPhotoRecord callable — direct client creates remain
+        // disallowed. Moderation (update/delete) is open.
+        allow create: if isAdmin();
+        allow update, delete: if true;
+      }
+
+      match /announcements/{id}        { allow read: if true; allow write: if true; }
+      match /sponsors/{id}             { allow read: if true; allow write: if true; }
+      match /kupSanka/{id}             { allow read: if true; allow write: if true; }
+      match /crossbar/{pid}            { allow read: if true; allow write: if true; }
+      match /awards/{awardId}          { allow read: if true; allow write: if true; }
+      match /lottery/{prizeId}         { allow read: if true; allow write: if true; }
+      match /lotteryParticipants/{pid} { allow read: if true; allow write: if true; }
+      match /lotterySession/{sid}      { allow read: if true; allow write: if true; }
+      match /content/{pageId}          { allow read: if true; allow write: if true; }
+
+      match /fanVotes/{pollId} {
+        allow read: if true;
+        allow create, update, delete: if true;
+
+        match /votes/{deviceId} {
+          allow read: if false;
+          allow create: if get(/databases/$(database)/documents/tournaments/$(tid)/fanVotes/$(pollId)).data.status == 'open';
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // ------------------------------------------------------------
+    // /champions — historical winners. Admin only.
+    // ------------------------------------------------------------
+    match /champions/{year} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // /photoRateLimits — function-only.
+    match /photoRateLimits/{ipHash} {
+      allow read, write: if false;
+    }
+
+    // Anonymous push subscriptions — id is the FCM registration token.
+    match /pushSubscriptions/{token} {
+      allow read: if false;
+      allow create, update: if request.resource.data.token == token;
+      allow delete: if false;
+    }
+
+    // Deny-all fallback.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

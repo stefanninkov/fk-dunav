@@ -461,6 +461,29 @@ Individual votes stored in subcollection `/tournaments/{id}/fanVotes/{pollId}/vo
 
 ---
 
+### 1.15 `/tournaments/{id}/lottery/{prizeId}`
+
+Awards overview for the end-of-tournament **Lutrija**. No ticket management, no draw mechanics — the physical draw happens off-app. Admin enters each prize winner by hand via `/admin/nagrade`. Multiple winners supported, ordered by `order` (1st, 2nd, 3rd …).
+
+```ts
+interface LotteryPrize {
+  id: string;
+  label: string;                   // e.g. "1. nagrada: TV", "2. nagrada: bicikl"
+  winnerName: string;              // e.g. "Marko Petrović"
+  winnerPhotoUrl?: string;         // optional, Firebase Storage URL
+  order: number;                   // display order (0-indexed), smaller = higher prize
+  awardedAt: Timestamp;            // when the admin recorded the winner
+  createdBy: string;               // uid of admin who created the entry
+}
+```
+
+**Indexes:**
+- `order asc` (single) — for public board ordering.
+
+**Security:** read: public. Write: admin only.
+
+---
+
 ## 2. Top-level collections (not tournament-scoped)
 
 ### 2.1 `/users/{uid}`

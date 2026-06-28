@@ -8,7 +8,7 @@ This file is the primary context for Claude Code working on this project. Read i
 
 Reusable tournament platform for **FK Dunav Ostrovo**, first deployed for the 2026 edition on **June 27–28, 2026**. Replaces the Webflow static site from 2025 (`https://fk-dunav.webflow.io/`) with a dynamic app where live results, match events, photos, and side competitions are updated in real time by multiple reporters and visible live to the public.
 
-**Owner:** Stefan (sole developer).
+**Owner:** Stefan (sole developer) — `stefan.ninkov@gmail.com` is the sole bootstrap admin; added manually to the `/adminEmails` Firestore collection via Firebase console before first deploy. All other admins/reporters are invited later through `/admin/korisnici`.
 **Brand:** FK Dunav blue `#01458E`, logo in `/assets/logo.svg` (68KB SVG with embedded raster).
 **Language:** Latin-script Serbian throughout the UI. No Cyrillic, no English toggle.
 **Deadline:** Tournament kicks off **June 27, 2026** — the site must be fully operational with reporters trained by **June 20, 2026**.
@@ -42,7 +42,8 @@ fk-dunav-tournament/
 │   ├── ARCHITECTURE.md       ← routing, auth, offline, FCM, image pipeline
 │   ├── SECURITY-RULES.md     ← Firestore + Storage rules logic
 │   ├── DESIGN.md             ← brand, tokens, component system
-│   └── ROADMAP.md            ← 10-week sprint plan
+│   ├── ROADMAP.md            ← 10-phase build plan
+│   └── REPORTER-GUIDE.md     ← reporter quick-start (printable + /admin/pomoc)
 ├── assets/
 │   └── logo.svg              ← brand logo
 ├── src/
@@ -151,13 +152,13 @@ All of Stefan's standing GSAP rules apply — see his memory. Highlights:
 
 2. **Public site is read-only, anonymous.** No login required to view anything. No tracking beyond basic anonymous analytics.
 
-3. **Photo uploads are open but moderated.** Anyone can submit, Stefan (and any user with `admin` role) approves. Unapproved photos are NEVER visible on the public site — enforce via security rules, not just UI.
+3. **Photo uploads are open but moderated.** Anyone can submit. Submissions go through `createPhotoRecord` (HTTPS callable in `functions/src/index.ts`) which IP-rate-limits at 5/hour and writes the doc as admin. Direct anonymous Firestore writes to `/photos` are denied. Unapproved photos are NEVER visible on the public site.
 
-4. **Roles are stored in Firebase Auth custom claims**, not in Firestore user docs. Firestore `/users/{uid}` is for profile data only. Claims must be set by a Cloud Function triggered by an admin action.
+4. **Roles use a capability model, not custom claims.** Admins are emails listed in `/adminEmails` who self-promote into `/admins/{uid}` on first sign-in. Staff users are invited via `/invites/{email}` with a `caps: Capability[]` array; on first sign-in they self-promote into `/users/{uid}` with the same caps (rule enforces exact match). The five capabilities are `matches`, `teams`, `photos`, `side_events`, `content`. Firestore rules check `hasCap(<cap>)` per collection. Sidebar + per-route `CapabilityGuard` filter the admin UI to what each user can see. Capability claim via Cloud Functions is on the roadmap but blocked on enabling Google Cloud Identity Platform.
 
-5. **Tournament lifecycle:** only one tournament is `active` at a time. Historical tournaments become read-only. The 2025 Webflow data is archived at route `/2025` as a static replica of last year's site for continuity.
+5. **Tournament lifecycle:** only one tournament is `active` at a time. Historical tournaments become read-only. The `/sampioni` page reads top-level `/champions/{year}` docs that the admin enters by hand (`/admin/sampioni`). There is no Webflow import — the 2025 archive was scrapped before launch.
 
-6. **Rate limit anonymous photo uploads** at 5 per IP per hour, enforced by Cloud Function on upload. App Check must be enabled to prevent abuse.
+6. **Rate limit anonymous photo uploads** at 5 per IP per hour, enforced by `createPhotoRecord` callable. The IP hash is stored in `/photoRateLimits/{ipHash}` (function-only, no client access). App Check is wired (reCAPTCHA v3) but enforcement is OFF until tokens are seen flowing for ≥ 95% of requests.
 
 7. **Never block on the match clock.** If a reporter's clock is out of sync with reality, they can always override the displayed minute manually per event. The clock is a convenience, not a source of truth.
 
@@ -193,3 +194,39 @@ All of Stefan's standing GSAP rules apply — see his memory. Highlights:
 | What's the build plan? | `/docs/ROADMAP.md` |
 
 When in doubt, read `SPEC.md` first, then drill into the relevant doc. If the doc doesn't cover something, **ask Stefan rather than invent the answer**.
+
+---
+
+## Notable post-spec deltas (April 2026 session)
+
+These shipped after the original spec / roadmap was written. The `/docs`
+files predate them; treat the list below as authoritative.
+
+- **Capability roles** (see rule 4 above) replace the old admin/reporter
+  binary. UI: `/admin/korisnici` checkboxes; rule helper: `hasCap(<cap>)`;
+  per-route gate: `<CapabilityGuard cap="...">`.
+- **Igrači folded into Timovi.** `/admin/igraci` is gone. Player rosters
+  are an inline section of the team editor (`TeamEditor`); diff-batched
+  on save via `savePlayerRoster`.
+- **Group draw bubanj.** Teams may be created with `groupId === ''`
+  (= unassigned). `/admin/timovi` has a draw panel at the bottom; public
+  `/grupe` reveals an animated drum when `groupDrawSession.drumVisible`.
+- **Lutrija = numbered raffle.** No participant CRUD. Admin sets
+  `participantCount` on `lotterySession`; draws pick a random integer
+  1..N and write it onto a prize as `winnerName`.
+- **Public nav restructure.** Top header has flat tabs with **Rezultati**
+  and **Nagrade** acting as parents; on each child route `PublicLayout`
+  renders a `<SubTabs>` strip. Mobile uses a fixed bottom tab bar
+  (`MobileBottomNav`) with a "Više" sheet.
+- **Mobile admin nav.** `AdminLayout` has a slide-in drawer below the
+  `lg` breakpoint; sidebar items are filtered by capability.
+- **/2025 archive scrapped.** Champions history lives in `/champions/{year}`
+  edited via `/admin/sampioni`.
+- **Sentry + App Check wired.** SDK init in `src/lib/sentry.ts` and
+  `src/lib/firebase.ts`. App Check enforcement is OFF in console until
+  metrics confirm 95% verified requests.
+- **`promoteAdminOnLogin` Cloud Function removed.** Blocking auth
+  triggers need GCIP. Self-promotion is fully client-side via AppRoot.
+- **Photo upload path changed.** Client uploads to Storage, then calls
+  `createPhotoRecord` callable. Direct Firestore writes to `/photos` are
+  rule-denied; the function rate-limits by IP hash.

@@ -1,0 +1,35 @@
+name: Firebase deploy
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - '.github/workflows/firebase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy rules + indexes
+        # Only Firestore rules and indexes are auto-deployed. Storage rules
+        # and functions are out on purpose: storage.rules barely changes,
+        # and the Artifact Registry cleanup policy that `firebase deploy`
+        # tries to set up for functions requires IAM the CI service account
+        # doesn't have (and it fails the whole step even though the actual
+        # deploy succeeded). Both are one-off local tasks:
+        #   firebase deploy --only storage
+        #   firebase deploy --only functions --force
+        uses: w9jds/firebase-action@v14.2.0
+        with:
+          args: deploy --only firestore:rules,firestore:indexes --project fk-dunav --force
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

@@ -1,15 +1,14 @@
-# ROADMAP.md — 10-Week Build Plan
+# ROADMAP.md — 10-Phase Build Plan
 
-**Today:** April 17, 2026 (Friday).
-**Tournament kickoff:** June 27, 2026 (Saturday) — 10 weeks and 2 days out.
-**Reporters must be trained by:** June 20, 2026 — 9 weeks out.
-**Soft launch of public site:** June 13, 2026 — 8 weeks out (gives 2 weeks for spectators to discover).
+**Tournament kickoff:** June 27, 2026 (Saturday).
+**Reporters must be trained by:** June 20, 2026.
+**Soft launch of public site:** before June 13, 2026 (gives ~2 weeks for spectators to discover).
 
-Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused work. If a week slips, cut scope from side features (Kup Šanka, crossbar, fan voting) first — never cut from core match tracking.
+Each phase is one milestone — advance when its checklist is done, not on a calendar. If a phase falls behind, cut scope from side features (Kup Šanka, crossbar, fan voting) first — never cut from core match tracking.
 
 ---
 
-## Week 1 — Apr 17–24: Foundation
+## Phase 1 — Foundation
 **Goal:** Project scaffolded, environment working end-to-end, auth flow proven.
 
 - [ ] Create GitHub repo. Initialize with Vite + React + TS + Tailwind v4.
@@ -21,16 +20,16 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Firestore rules starter (deny-all fallback) and `firestore.indexes.json`.
 - [ ] Zustand `useAuthStore`, `useOfflineStore`, `useUIStore` created (empty shells).
 - [ ] `<PublicLayout>` and `<AdminLayout>` skeletons. Bottom nav on mobile for admin.
-- [ ] Login page with magic link flow. Admin bootstrap: Stefan's email in `/adminEmails` manually.
+- [ ] Login page with magic link flow. **Admin bootstrap:** before first deploy, Stefan adds a single document to the `/adminEmails` Firestore collection manually via the Firebase console with `email: "stefan.ninkov@gmail.com"` (the hardcoded sole day-one admin). The magic-link Cloud Function reads that collection on first sign-in and promotes the matching user to the `admin` custom claim. No other admins are hardcoded — everyone else joins later through `/admin/korisnici`.
 - [ ] First successful login end-to-end → lands on empty `/admin`.
 - [ ] GitHub Actions workflow: build + lint + typecheck on every push. Deploy to `gh-pages` on `main`.
 - [ ] Firebase deploy workflow for functions + rules.
 
-**End of week checkpoint:** Stefan can log into an empty but working dashboard on a custom GitHub Pages URL.
+**End of phase checkpoint:** Stefan can log into an empty but working dashboard on a custom GitHub Pages URL.
 
 ---
 
-## Week 2 — Apr 25–May 1: Data layer
+## Phase 2 — Data layer
 **Goal:** Tournament, teams, players, groups, schedule all CRUD from dashboard. Persistence confirmed.
 
 - [ ] Typed Firestore converters for every entity in `DATA-MODEL.md`.
@@ -43,11 +42,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Security rules wired for tournament, teams, groups, players, matches (reporter write / admin delete).
 - [ ] Seeded fixtures import helper: Stefan enters 2026 teams and schedule by hand (no auto-generation).
 
-**End of week checkpoint:** A complete tournament setup entered in the dashboard, visible in Firestore.
+**End of phase checkpoint:** A complete tournament setup entered in the dashboard, visible in Firestore.
 
 ---
 
-## Week 3 — May 2–8: Public site (static parts)
+## Phase 3 — Public site (static parts)
 **Goal:** Public site shell reads live data; looks like the finished product for scheduled-only matches.
 
 - [ ] Home page with hero, countdown, quick stats, placeholder for live + gallery + announcements.
@@ -61,11 +60,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Light smoke-test on real mobile (Stefan's phone + another device).
 - [ ] Serbian UI strings pass from `src/i18n/sr.ts` everywhere — no hardcoded Serbian text in components.
 
-**End of week checkpoint:** Public site feels real, loads scheduled matches, but no match activity yet.
+**End of phase checkpoint:** Public site feels real, loads scheduled matches, but no match activity yet.
 
 ---
 
-## Week 4 — May 9–15: Match editor core (the hardest feature)
+## Phase 4 — Match editor core (the hardest feature)
 **Goal:** Reporter can start a match, log events, end a match, with full offline support.
 
 - [ ] Match editor route `/admin/utakmice/:matchId`.
@@ -81,11 +80,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Security rules: reporter can create events, admin can soft-delete.
 - [ ] `match.score` recompute Cloud Function on event create/delete.
 
-**End of week checkpoint:** Stefan and one other person can simulate a match on two phones, log goals, end the match. Works with Wi-Fi off → on.
+**End of phase checkpoint:** Stefan and one other person can simulate a match on two phones, log goals, end the match. Works with Wi-Fi off → on.
 
 ---
 
-## Week 5 — May 16–22: Live public experience
+## Phase 5 — Live public experience
 **Goal:** Visitors see live matches update in real time with animation and sound.
 
 - [ ] `/uzivo` live page listing live matches.
@@ -95,16 +94,16 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
   - Finished view with summary.
 - [ ] Score animation (GSAP: scale pop + brand-blue glow) on score change, respecting `prefers-reduced-motion`.
 - [ ] Goal sound with mute toggle in header, persisted to localStorage.
-- [ ] Share button generates WhatsApp/Instagram deep link (with generic OG card for now — dynamic OG in Week 9).
+- [ ] Share button generates WhatsApp/Instagram deep link (with generic OG card for now — dynamic OG in Phase 9).
 - [ ] "Prati meč" button with FCM token generation + subscription to `/pushSubscriptions`.
 - [ ] iOS install prompt when user on iOS Safari taps Follow.
 - [ ] Cloud Function `onMatchEvent` → FCM push for matchStart / goal / matchEnd.
 
-**End of week checkpoint:** Stefan's phone receives push when a test reporter logs a goal from another phone.
+**End of phase checkpoint:** Stefan's phone receives push when a test reporter logs a goal from another phone.
 
 ---
 
-## Week 6 — May 23–29: Knockout, standings, shootouts
+## Phase 6 — Knockout, standings, shootouts
 **Goal:** Automatic standings calculation; knockout bracket works end-to-end including shootouts.
 
 - [ ] `<GroupStandings>` rendering with tiebreaker logic (H2H → GD → GF).
@@ -119,11 +118,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] `<BracketNode>` shows shootout result when applicable.
 - [ ] Abandoned match handling (admin marks abandoned, standings skip).
 
-**End of week checkpoint:** Full simulated group stage → bracket auto-populates → knockout plays out → shootout resolves. Tested on two devices.
+**End of phase checkpoint:** Full simulated group stage → bracket auto-populates → knockout plays out → shootout resolves. Tested on two devices.
 
 ---
 
-## Week 7 — May 30–June 5: Photos, gallery, moderation, push broadcasts
+## Phase 7 — Photos, gallery, moderation, push broadcasts
 **Goal:** Anyone can upload. Stefan can moderate from phone. Approved photos appear instantly in gallery.
 
 - [ ] `<UploadModal>` with file picker, preview, tags (match/team/day), uploader name optional.
@@ -143,11 +142,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Urgent announcement → broadcast push to subscribers.
 - [ ] `<AnnouncementBanner>` dismissible on public site.
 
-**End of week checkpoint:** Test upload from a random phone → Stefan gets email → approves on his phone → photo appears in gallery.
+**End of phase checkpoint:** Test upload from a random phone → Stefan gets email → approves on his phone → photo appears in gallery.
 
 ---
 
-## Week 8 — June 6–12: Side features + stats + polish
+## Phase 8 — Side features + stats + polish
 **Goal:** All remaining surface area filled in.
 
 - [ ] Top scorers auto-computed: Cloud Function aggregates goal events per player on event create.
@@ -157,18 +156,20 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] `/admin/precka` editor + `<CrossbarBracket>` on public stats page.
 - [ ] `/admin/sponzori` CRUD + `<SponsorGrid>` + `<SponsorTicker>` in footer.
 - [ ] `/sponzori` public page with tiers.
-- [ ] `/admin/nagrade` — awards entry (champions, MVP, runner-up, 3rd, top scorer, team of the tournament).
-- [ ] `<AwardsBoard>` on public stats page (visible once populated).
+- [ ] `/admin/nagrade` — awards entry (champions, MVP, runner-up, 3rd, top scorer, team of the tournament, **crossbar / prečka bosom nogom winner**).
+- [ ] `<AwardsBoard>` on public stats page (visible once populated) — surfaces the crossbar winner as a peer award alongside Champion / Runner-up / MVP / Top Scorer.
+- [ ] **Lutrija (awards overview only):** `/admin/nagrade` Lutrija sub-section — admin enters prize winners by hand (prize label, winner name, optional photo, order). Writes to `/tournaments/{id}/lottery/{prizeId}`. No ticket management, no draw mechanics.
+- [ ] `<LotteryBoard>` rendered on `/statistika` as its own public section; mirrored by `<LotteryBoardEditor>` on `/admin/nagrade`.
 - [ ] `<FanVotePoll>` on `/statistika` once admin opens a poll.
 - [ ] `/admin/glasanje` poll management.
 - [ ] One vote per device enforced via cookie + security rule.
 - [ ] `/admin/korisnici` invite management + reporter promote/demote.
 
-**End of week checkpoint:** Every feature from `SPEC.md` has at least one end-to-end path working. Polish pass begins.
+**End of phase checkpoint:** Every feature from `SPEC.md` has at least one end-to-end path working. Polish pass begins.
 
 ---
 
-## Week 9 — June 13–19: Production hardening + hosting migration
+## Phase 9 — Production hardening + hosting migration
 **Goal:** Dynamic OG cards. Full offline resilience. Bug bash. Deploy to production domain.
 
 - [ ] Switch hosting from GitHub Pages to Firebase Hosting (or Vercel).
@@ -186,11 +187,11 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 - [ ] Archive 2025: `/2025` static page recreated from current Webflow content.
 - [ ] Public soft launch: share site link with small test audience, collect feedback.
 
-**End of week checkpoint:** Site is live at production domain. Real photos and announcements flowing in.
+**End of phase checkpoint:** Site is live at production domain. Real photos and announcements flowing in.
 
 ---
 
-## Week 10 — June 20–27: Reporter training + final bug fixes + tournament
+## Phase 10 — Reporter training + final bug fixes + tournament
 **Goal:** Reporters confident. Zero known critical bugs. Tournament goes smooth.
 
 - [ ] **June 20:** Reporter training session (in person or video call).
@@ -208,7 +209,7 @@ Each week is roughly one milestone. Weeks assume ~25–35 hours/week of focused 
 
 ---
 
-## Scope cut priorities (if weeks slip)
+## Scope cut priorities (if phases slip)
 
 Cut in this order — **top of list is first to cut**:
 
@@ -249,11 +250,11 @@ These are the tournament.
 
 | Risk | Mitigation |
 |---|---|
-| Stadium Wi-Fi fails | Firestore offline persistence + append-only events. Tested in Week 4 and Week 9. |
+| Stadium Wi-Fi fails | Firestore offline persistence + append-only events. Tested in Phase 4 and Phase 9. |
 | Reporter logs wrong event | Admin can soft-delete any event after the fact. |
 | Two reporters edit same match | `clientEventId` prevents duplicates; admin dedupes if they happen. |
-| iOS push doesn't fire | Install-to-home-screen prompt; fall back to manual refresh. Tested in Week 5. |
-| Spam photo uploads | IP rate limit + App Check. Tested in Week 7. |
+| iOS push doesn't fire | Install-to-home-screen prompt; fall back to manual refresh. Tested in Phase 5. |
+| Spam photo uploads | IP rate limit + App Check. Tested in Phase 7. |
 | Custom domain not ready | Site lives at GitHub Pages URL until the domain arrives. OG cards deferred. |
 | Firebase quotas exceeded | Unlikely for small tournament (est < 10k reads/day). Pricing alerts at 80%. |
 | Reporter forgets password / link | No passwords (magic link). Stefan can re-send invite. |
@@ -264,17 +265,16 @@ These are the tournament.
 
 ## Dependencies & blocked items
 
-- **Logo quality:** current `/assets/logo.svg` is a rasterized SVG (raster embedded in SVG wrapper). May pixelate at large sizes. Before Week 1 ends, confirm with Stefan whether to commission a true-vector redraw.
-- **Production domain:** needed before Week 9 (OG card setup + hosting migration). Stefan to provide.
-- **Reporter list:** Stefan to confirm names + emails by end of Week 8 so invites can go out Week 10 training.
-- **2025 archive content:** Stefan to confirm what gets preserved at `/2025` (Week 3 task depends on this).
-- **Sponsor logos and info:** by end of Week 7 to populate Week 8.
+- **Logo quality:** current `/assets/logo.svg` is a rasterized SVG (raster embedded in SVG wrapper). May pixelate at large sizes. Before Phase 1 ends, confirm with Stefan whether to commission a true-vector redraw.
+- **Production domain:** needed before Phase 9 (OG card setup + hosting migration). Stefan to provide.
+- **Reporter list:** Stefan to confirm names + emails by end of Phase 8 so invites can go out before Phase 10 training.
+- **2025 archive content:** Stefan to confirm what gets preserved at `/2025` (Phase 3 task depends on this).
+- **Sponsor logos and info:** by end of Phase 7 to populate Phase 8.
 
 ---
 
 ## Working cadence
 
-- Weekly check-in: Stefan reviews progress every Friday; adjusts scope for following week.
-- No feature merges Thursday afternoon before a release — always leave Friday for bug-fix buffer.
+- Regular check-in: Stefan reviews progress at the end of each phase; adjusts scope for the next.
 - Main branch always deployable. Feature branches short-lived.
-- Commit daily. Push daily. Deploy at least weekly.
+- Commit daily. Push daily. Deploy after each phase at minimum.

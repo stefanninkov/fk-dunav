@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+
+/* ------------------------------------------------------------------
+ * Design tokens — mirrors docs/DESIGN.md. Never hardcode values
+ * in components; reference these via Tailwind utilities.
+ * ------------------------------------------------------------------ */
+@theme {
+  /* Brand */
+  --color-brand-50:  #e6eef7;
+  --color-brand-100: #ccddef;
+  --color-brand-200: #99bbdf;
+  --color-brand-300: #6699ce;
+  --color-brand-400: #3377be;
+  --color-brand-500: #0055ae;
+  --color-brand-600: #01458e;
+  --color-brand-700: #013570;
+  --color-brand-800: #002651;
+  --color-brand-900: #001833;
+  --color-brand-950: #000c1a;
+  --color-brand:     #01458e;
+
+  /* Surfaces */
+  --color-surface-0: #0a0e14;
+  --color-surface-1: #0f1520;
+  --color-surface-2: #161e2c;
+  --color-surface-3: #202a3c;
+  --color-surface-4: #2a364b;
+
+  /* Ink / text */
+  --color-ink-primary:   #f5f7fa;
+  --color-ink-secondary: #b4bccc;
+  --color-ink-tertiary:  #7a8498;
+  --color-ink-disabled:  #4f586b;
+  --color-ink-inverse:   #0a0e14;
+
+  /* Status */
+  --color-success:      #22c55e;
+  --color-success-soft: #22c55e1a;
+  --color-warning:      #f59e0b;
+  --color-warning-soft: #f59e0b1a;
+  --color-danger:       #ef4444;
+  --color-danger-soft:  #ef44441a;
+  --color-live:         #ff3366;
+  --color-live-soft:    #ff33661a;
+
+  /* Accents (podium) */
+  --color-accent-gold:   #f4c542;
+  --color-accent-silver: #bfc6d1;
+  --color-accent-bronze: #c88a5c;
+
+  /* Typography */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+
+  --text-score:     4rem;
+  --text-score--line-height: 1;
+  --text-score-lg:  6rem;
+  --text-score-lg--line-height: 1;
+  --text-timer:     2rem;
+  --text-timer--line-height: 1;
+
+  /* Spacing */
+  --spacing-touch:     2.75rem; /* 44px */
+  --spacing-page-x:    1rem;
+  --spacing-page-x-lg: 2rem;
+
+  /* Radius */
+  --radius-xs:  0.25rem;
+  --radius-sm:  0.375rem;
+  --radius-md:  0.5rem;
+  --radius-lg:  0.75rem;
+  --radius-xl:  1rem;
+  --radius-2xl: 1.5rem;
+
+  /* Shadows */
+  --shadow-card:     0 1px 2px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-card-hov: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-elevated: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-glow:     0 0 20px rgba(1, 69, 142, 0.35);
+}
+
+/* ------------------------------------------------------------------
+ * Global resets + defaults
+ * ------------------------------------------------------------------ */
+html {
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+body {
+  background: var(--color-surface-0);
+  color: var(--color-ink-primary);
+}
+
+/* Tabular numerals for scores, timers, standings. */
+.tnum {
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus ring — always visible, never removed. */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Reduce motion — global fallback for CSS transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

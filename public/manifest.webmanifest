@@ -1,0 +1,32 @@
+{
+  "name": "FK Dunav Ostrovo — Turnir",
+  "short_name": "FK Dunav",
+  "description": "Uživo rezultati, raspored, galerija i sporedna takmičenja FK Dunav Ostrovo turnira.",
+  "start_url": "/fk-dunav/",
+  "scope": "/fk-dunav/",
+  "display": "standalone",
+  "background_color": "#000c1e",
+  "theme_color": "#01458E",
+  "orientation": "portrait",
+  "lang": "sr-Latn",
+  "icons": [
+    {
+      "src": "/fk-dunav/assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/fk-dunav/assets/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fk-dunav/assets/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

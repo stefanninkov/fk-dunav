@@ -372,7 +372,7 @@ Similar, but queries `pushSubscriptions` where `subscribedToBroadcasts == true` 
 - **(A) Prerender for bots.** Detect crawler UA via a Cloudflare Worker (if we put CF in front) and serve a prerendered HTML with OG meta for that match.
 - **(B) Move to Firebase Hosting or Vercel** when we go to production domain. Use hosting rewrites to serve `/utakmica/:id` through a Cloud Function that injects meta tags server-side.
 
-**Plan:** ship on GitHub Pages with a generic site-wide OG card for initial weeks. Switch to Firebase Hosting before tournament kickoff (~ 1 week before) with dynamic meta rewrites. Document the migration as its own task in `ROADMAP.md`.
+**Plan:** ship on GitHub Pages with a generic site-wide OG card for initial phases. Switch to Firebase Hosting before tournament kickoff with dynamic meta rewrites. Document the migration as its own task in `ROADMAP.md`.
 
 Alternative: Vercel deployment with an edge function that handles `/utakmica/:id` HTML injection — easy to set up, free tier covers this easily.
 

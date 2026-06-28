@@ -70,7 +70,8 @@ A tournament management platform built for FK Dunav Ostrovo's annual small-sided
 - **Discipline:** yellow cards and red cards per player.
 - **Kup Šanka** (beer cup leaderboard): team + number of bokala.
 - **Crossbar competition (BOSONOGI):** qualifiers list + final bracket.
-- **Team of the tournament / player awards** (admin-curated, published at end).
+- **Team of the tournament / player awards** (admin-curated, published at end). Includes Champion, Runner-up, MVP, Top Scorer, and the **Takmičenje u gađanju prečke bosom nogom** winner — all surfaced together on the public awards board.
+- **Lutrija (awards overview only):** a dedicated section listing prize winners drawn in the traditional end-of-tournament lottery. Read-only view: prize label, winner name, optional photo, ordered by the admin (1st, 2nd, 3rd …). No ticket management, no draw mechanics — the physical draw happens off-app and the admin enters the results by hand via `/admin/nagrade`. Example rows: "1. nagrada: TV — Marko Petrović", "2. nagrada: bicikl — Ana Jović".
 - **Fan voting:** MVP of tournament + best goal (opens after finals, closes a week later).
 
 ### 3.9 Gallery (`/galerija`)
@@ -197,8 +198,8 @@ The core reporter workflow. Must be rock-solid on mobile.
 
 ### 4.12 Side competitions
 - **Kup Šanka (`/admin/kup-sanka`):** list of teams with editable "bokala" count. Sorted leaderboard.
-- **Crossbar (`/admin/precka`):** qualifying list, final bracket, winner recording.
-- **Awards (`/admin/nagrade`):** MVP, Team of the Tournament, champions, runners-up. Set at end of tournament.
+- **Crossbar — Takmičenje u gađanju prečke bosom nogom (`/admin/precka`):** qualifying list, final bracket, winner recording. The winner is **also written as an award entry** so they surface on the public awards board alongside Champion / Runner-up / MVP / Top Scorer. The existing `/tournaments/{id}/crossbar` collection continues to cover the competition itself — no change there.
+- **Awards (`/admin/nagrade`):** champions, runners-up, MVP, top scorer, team of the tournament, and the crossbar (prečka) winner. Set at end of tournament. This page also hosts the **Lutrija** sub-section where the admin records prize winners by hand: prize label (e.g. "1. nagrada: TV"), winner name, optional photo, display order. Multiple winners supported. Saved entries appear immediately on the public `/statistika` → Lutrija board.
 
 ### 4.13 Tournament settings (`/admin/turnir`)
 - Active tournament config: name, dates, fields (names), match time format (halves × minutes), knockout qualifiers per group, tiebreaker order (locked to current choice for 2026).
@@ -231,7 +232,7 @@ The core reporter workflow. Must be rock-solid on mobile.
 6. Token refreshes, app routes to `/admin`.
 7. Session persists 30 days; re-auth required after that.
 
-Admin bootstrap: Stefan's email is added manually to `/admin-emails` Firestore doc; Cloud Function on first login promotes him to `admin` claim.
+Admin bootstrap: `stefan.ninkov@gmail.com` is hardcoded as the sole day-one admin. Before the first deploy, this email is added manually via the Firebase console as a document in the `/adminEmails` Firestore collection (doc id = the email, or an auto-id with `{ email }` as the field — see `/docs/DATA-MODEL.md`). A Cloud Function on first login reads `/adminEmails`, matches the signed-in email, and sets the `admin` custom claim. No other admins are hardcoded — every subsequent admin or reporter is created through the invite flow at `/admin/korisnici` once Stefan is signed in.
 
 ---
 
