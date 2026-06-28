@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { Trash2, Wand2 } from 'lucide-react';
+import { RefreshCw, Trash2, Wand2 } from 'lucide-react';
 
 import { groupsCol, matchesCol, teamsCol } from '@/lib/firestore/refs';
 import type { Group, Match, Team } from '@/lib/firestore/types';
@@ -10,6 +10,7 @@ import { useTournamentStore } from '@/stores/useTournamentStore';
 import {
   deleteUnfinishedKnockoutDownstream,
   generateBracketMatches,
+  syncKnockoutDownstreamTeams,
   type GenerateBracketResult,
 } from '@/features/match/generateBracket';
 
@@ -57,6 +58,30 @@ export function AdminMatchesPage() {
         tiebreakerOrder: active.config.tiebreakerOrder,
       });
       setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : sr.common.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSyncDownstream() {
+    if (!active) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const changed = await syncKnockoutDownstreamTeams({
+        tournamentId: active.id,
+        matches: matches ?? [],
+      });
+      setResult({
+        created: changed,
+        skipped:
+          changed.length === 0
+            ? [{ slot: '—', reason: 'sve PF/finale već odgovaraju /nokaut tabu' }]
+            : [],
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : sr.common.errorGeneric);
     } finally {
@@ -120,12 +145,25 @@ export function AdminMatchesPage() {
       m.status === 'scheduled' &&
       m.knockoutRound !== 'qf',
   );
+  const canSyncDownstream = hasScheduledDownstream;
 
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-700">{sr.admin.nav.matches}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canSyncDownstream ? (
+            <button
+              type="button"
+              onClick={() => void handleSyncDownstream()}
+              disabled={busy}
+              className="inline-flex h-touch items-center gap-2 rounded-md border border-surface-4 px-3 text-ink-secondary hover:bg-surface-2 disabled:opacity-60"
+              title="Ažuriraj PF/finale prema /nokaut tabu (gotove utakmice se ne diraju)"
+            >
+              <RefreshCw size={14} />
+              Sinhronizuj nokaut
+            </button>
+          ) : null}
           {hasScheduledDownstream ? (
             <button
               type="button"

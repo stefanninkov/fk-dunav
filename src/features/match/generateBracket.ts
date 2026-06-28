@@ -7,7 +7,11 @@ import type {
   TiebreakerKey,
   Tournament,
 } from '@/lib/firestore/types';
-import { createMatch, deleteMatch } from '@/features/match/matchActions';
+import {
+  createMatch,
+  deleteMatch,
+  updateMatchSchedule,
+} from '@/features/match/matchActions';
 import { computeStandings, sortStandings } from '@/lib/utils/standings';
 
 /**
@@ -264,4 +268,68 @@ export async function deleteUnfinishedKnockoutDownstream(
     await deleteMatch(tournamentId, m.id);
   }
   return targets.map((m) => m.bracketSlot ?? m.id);
+}
+
+/**
+ * Walk every existing SF / TP / FINAL doc whose status is still
+ * 'scheduled' and rewrite teamA/teamB to whatever the /nokaut TEMPLATE
+ * would put there. Live + finished docs are left untouched so
+ * in-progress reporters and final scorelines don't get clobbered.
+ *
+ * Returns the list of bracketSlot strings that actually changed.
+ */
+export async function syncKnockoutDownstreamTeams(params: {
+  tournamentId: string;
+  matches: Match[];
+}): Promise<string[]> {
+  const { tournamentId, matches } = params;
+  const matchBySlot = new Map<string, Match>();
+  for (const m of matches) {
+    if (m.phase === 'knockout' && m.bracketSlot) matchBySlot.set(m.bracketSlot, m);
+  }
+
+  function resolve(ref: SourceRef): TeamSnapshot {
+    if (ref.type === 'standing') {
+      // Standings-based sources only apply to QFs, which this helper
+      // explicitly skips. Hand back the placeholder anyway so callers
+      // get a deterministic value.
+      return placeholderStanding(ref.pos, ref.letter);
+    }
+    const source = matchBySlot.get(ref.sourceSlot);
+    if (source && source.status === 'finished') {
+      const aWon = source.shootoutScore
+        ? source.shootoutScore.a > source.shootoutScore.b
+        : source.score.a > source.score.b;
+      const winnerSnap = aWon ? source.teamA : source.teamB;
+      const loserSnap = aWon ? source.teamB : source.teamA;
+      return ref.type === 'winner' ? winnerSnap : loserSnap;
+    }
+    return placeholderDerived(ref.type, ref.sourceSlot);
+  }
+
+  const changed: string[] = [];
+  for (const cell of TEMPLATE) {
+    if (cell.round === 'qf') continue;
+    const existing = matchBySlot.get(cell.slot);
+    if (!existing) continue;
+    if (existing.status !== 'scheduled') continue;
+
+    const expectedA = resolve(cell.teamA);
+    const expectedB = resolve(cell.teamB);
+
+    const aSame =
+      existing.teamA.teamId === expectedA.teamId &&
+      existing.teamA.name === expectedA.name;
+    const bSame =
+      existing.teamB.teamId === expectedB.teamId &&
+      existing.teamB.name === expectedB.name;
+    if (aSame && bSame) continue;
+
+    await updateMatchSchedule(tournamentId, existing.id, {
+      teamA: expectedA,
+      teamB: expectedB,
+    });
+    changed.push(cell.slot);
+  }
+  return changed;
 }
